@@ -70,6 +70,14 @@ V0.2 的截图问 AI、剪贴板、文件拖入和提醒功能尚未加入。
 .\scripts\publish.ps1
 ```
 
+生成带有 .NET 运行环境的正式 Windows x64 ZIP 和 SHA-256 校验文件：
+
+```powershell
+.\scripts\publish-release.ps1 -Version 0.1.1
+```
+
+发布脚本默认拒绝覆盖已有的同版本文件。确认目标版本可以重建后，才可显式添加 `-Force`。
+
 ## 项目结构
 
 - `src/DragonDeskPet/`：WPF 桌宠程序。
@@ -77,7 +85,7 @@ V0.2 的截图问 AI、剪贴板、文件拖入和提醒功能尚未加入。
 - `assets/character/`：七张正式角色状态素材。
 - `assets/icons/`：程序与托盘图标。
 - `docs/`：需求、素材规范和验收清单。
-- `scripts/`：构建、测试、运行和发布脚本。
+- `scripts/`：构建、测试、运行和正式发布脚本。
 
 ## 授权
 
