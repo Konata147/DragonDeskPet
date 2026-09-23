@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+.idea/
+.dotnet-cli/
+.nuget/
+dist/
+data/
+**/data/
+references/
+assets/character/candidates/
+*.zip
+*.user
+*.suo
+settings.local.json

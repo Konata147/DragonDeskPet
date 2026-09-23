@@ -1,0 +1,18 @@
+﻿<Application x:Class="DragonDeskPet.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#8C70D9" />
+        <SolidColorBrush x:Key="AccentLightBrush" Color="#EEE8FF" />
+        <SolidColorBrush x:Key="TextBrush" Color="#2D2840" />
+        <Style TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="#EEE8FF" />
+            <Setter Property="Foreground" Value="#382C57" />
+        </Style>
+    </Application.Resources>
+</Application>

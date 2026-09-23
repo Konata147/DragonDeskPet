@@ -1,0 +1,84 @@
+<Window x:Class="DragonDeskPet.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="龙娘桌宠设置"
+        Width="500" Height="600"
+        MinWidth="460" MinHeight="540"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="#F8F6FC"
+        ShowInTaskbar="False">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="设置" FontSize="24" FontWeight="SemiBold" Foreground="#30283F" />
+            <TextBlock Text="角色保持不变，只切换她背后的 AI 大脑。" Margin="0,5,0,18" Foreground="#746B82" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Border Background="White" CornerRadius="14" Padding="18" Margin="0,0,0,14">
+                    <StackPanel>
+                        <TextBlock Text="AI 大脑" FontSize="16" FontWeight="SemiBold" Foreground="#3D3450" Margin="0,0,0,12" />
+
+                        <TextBlock Text="提供商" Foreground="#615872" />
+                        <ComboBox x:Name="ProviderBox"
+                                  Margin="0,5,0,12"
+                                  MinHeight="34"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="Id"
+                                  SelectionChanged="ProviderBox_SelectionChanged" />
+
+                        <TextBlock Text="模型" Foreground="#615872" />
+                        <TextBox x:Name="ModelTextBox" Margin="0,5,0,12" MinHeight="34" Padding="8,6" />
+
+                        <TextBlock Text="Base URL" Foreground="#615872" />
+                        <TextBox x:Name="BaseUrlTextBox" Margin="0,5,0,12" MinHeight="34" Padding="8,6" />
+
+                        <TextBlock Text="API Key" Foreground="#615872" />
+                        <PasswordBox x:Name="ApiKeyBox" Margin="0,5,0,6" MinHeight="34" Padding="8,6" />
+                        <TextBlock Text="只保存在本机，并使用当前 Windows 用户身份加密。"
+                                   FontSize="11" Foreground="#887E96" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="White" CornerRadius="14" Padding="18">
+                    <StackPanel>
+                        <TextBlock Text="桌宠" FontSize="16" FontWeight="SemiBold" Foreground="#3D3450" Margin="0,0,0,12" />
+                        <DockPanel Margin="0,0,0,4">
+                            <TextBlock Text="角色缩放" Foreground="#615872" />
+                            <TextBlock x:Name="ScaleValueText" DockPanel.Dock="Right" Foreground="#8066B2" FontWeight="SemiBold" />
+                        </DockPanel>
+                        <Slider x:Name="ScaleSlider"
+                                Minimum="0.6" Maximum="2.0"
+                                TickFrequency="0.1"
+                                IsSnapToTickEnabled="True"
+                                ValueChanged="ScaleSlider_ValueChanged"
+                                Margin="0,4,0,12" />
+                        <CheckBox x:Name="AlwaysOnTopBox" Content="始终置顶" Margin="0,5" />
+                        <CheckBox x:Name="StartWithWindowsBox" Content="登录 Windows 时自动启动" Margin="0,5" />
+                    </StackPanel>
+                </Border>
+
+                <TextBlock x:Name="ValidationText"
+                           Foreground="#B34B69"
+                           TextWrapping="Wrap"
+                           Margin="4,12,4,0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="取消" MinWidth="78" Click="CancelButton_Click" />
+            <Button Content="保存"
+                    MinWidth="88"
+                    Background="{StaticResource AccentBrush}"
+                    Foreground="White"
+                    Click="SaveButton_Click" />
+        </StackPanel>
+    </Grid>
+</Window>
