@@ -9,6 +9,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>DragonDeskPet</AssemblyName>
     <RootNamespace>DragonDeskPet</RootNamespace>
+    <Version>0.1.1-dev</Version>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\assets\icons\app.ico</ApplicationIcon>
   </PropertyGroup>

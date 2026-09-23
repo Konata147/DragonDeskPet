@@ -61,6 +61,7 @@ dotnet publish $projectPath `
     --self-contained true `
     --output $publishDirectory `
     "-p:Version=$Version" `
+    '-p:IncludeSourceRevisionInInformationalVersion=false' `
     '-p:DebugType=None' `
     '-p:DebugSymbols=false'
 
@@ -71,6 +72,26 @@ if ($LASTEXITCODE -ne 0) {
 $executablePath = Join-Path $publishDirectory 'DragonDeskPet.exe'
 if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
     throw "Published executable was not found: $executablePath"
+}
+
+$assemblyPath = Join-Path $publishDirectory 'DragonDeskPet.dll'
+$executable = Get-Item -LiteralPath $executablePath
+$productVersion = $executable.VersionInfo.ProductVersion
+$fileVersion = $executable.VersionInfo.FileVersion
+$assemblyVersion = [System.Reflection.AssemblyName]::GetAssemblyName($assemblyPath).Version.ToString()
+$numericVersion = $Version.Split('-', 2)[0]
+$expectedBinaryVersion = "$numericVersion.0"
+
+if ($productVersion -ne $Version) {
+    throw "Product version mismatch. Expected '$Version', found '$productVersion'."
+}
+
+if ($fileVersion -ne $expectedBinaryVersion) {
+    throw "File version mismatch. Expected '$expectedBinaryVersion', found '$fileVersion'."
+}
+
+if ($assemblyVersion -ne $expectedBinaryVersion) {
+    throw "Assembly version mismatch. Expected '$expectedBinaryVersion', found '$assemblyVersion'."
 }
 
 Compress-Archive `
@@ -92,6 +113,9 @@ $archiveBytes = (Get-Item -LiteralPath $archivePath).Length
 Write-Host "Release directory: $publishDirectory"
 Write-Host "Release files: $($publishedFiles.Count)"
 Write-Host "Release size: $([math]::Round($publishedBytes / 1MB, 2)) MB"
+Write-Host "Product version: $productVersion"
+Write-Host "File version: $fileVersion"
+Write-Host "Assembly version: $assemblyVersion"
 Write-Host "Archive: $archivePath"
 Write-Host "Archive size: $([math]::Round($archiveBytes / 1MB, 2)) MB"
 Write-Host "SHA-256: $($hash.Hash)"
