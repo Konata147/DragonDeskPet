@@ -1,5 +1,7 @@
 # DragonDeskPet
 
+[![Build and smoke test](https://github.com/Konata147/DragonDeskPet/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/Konata147/DragonDeskPet/actions/workflows/build-and-test.yml)
+
 一只轻量、透明、可拖动的 Windows Q 版龙娘桌宠，也是一个与模型供应商解耦的桌面 AI 助手。
 
 > A lightweight native Windows dragon-girl desktop pet with a provider-neutral AI boundary.
@@ -11,6 +13,8 @@
 ## 当前版本
 
 V0.1 已完成并通过 12 项自动冒烟测试。正式版本包含透明桌宠窗口、七种角色状态、托盘控制、便携式设置、迷你聊天气泡、单实例唤醒、首次启动引导、崩溃日志和统一程序图标。
+
+`main` 分支在每次推送和合并请求时通过 GitHub Actions 使用 Windows 与稳定版 .NET 8 自动执行零警告构建和全部冒烟测试。
 
 V0.2 的截图问 AI、剪贴板、文件拖入和提醒功能尚未加入。
 
