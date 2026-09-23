@@ -27,3 +27,7 @@ The project, build output, .NET CLI cache, NuGet package cache, runtime settings
 ## Art
 
 The seven production sprites are stored in `assets/character/`: `default.png`, `hover.png`, `dragged.png`, `thinking.png`, `happy.png`, `angry.png`, and `sleeping.png`. Every sprite uses the same transparent 1241 × 1268 canvas and the approved scaled-tail anatomy. A missing or damaged state image falls back to `default.png`; reference images under `references/` are never loaded at runtime.
+
+## License
+
+The software source code is available under the [MIT License](LICENSE). Character artwork, the application icon, and other visual assets are excluded from the MIT License and are governed by [ASSET_LICENSE.md](ASSET_LICENSE.md).
