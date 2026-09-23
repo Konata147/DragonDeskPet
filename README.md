@@ -94,3 +94,7 @@ V0.2 的截图问 AI、剪贴板、文件拖入和提醒功能尚未加入。
 ## 授权
 
 程序源代码采用 [MIT License](LICENSE)。角色美术、程序图标和其他视觉素材不属于 MIT 授权范围，具体规则见 [ASSET_LICENSE.md](ASSET_LICENSE.md)。参考原图不包含在仓库或发布包中。
+
+## 参与贡献和安全
+
+提交代码、文档或素材前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。如果问题可能涉及密钥、隐私数据、网络传输或本地权限，请不要公开披露细节，并按照 [SECURITY.md](SECURITY.md) 中的方式报告。
