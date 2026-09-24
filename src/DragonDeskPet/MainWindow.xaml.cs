@@ -21,11 +21,21 @@ namespace DragonDeskPet;
 
 public partial class MainWindow : Window
 {
+    private const double LogicalSurfaceWidth = 430;
+    private const double LogicalSurfaceHeight = 310;
+    private const double SurfaceLeftPadding = 150;
+    private const double SurfaceTopPadding = 150;
+    private const double SurfaceRightPadding = 130;
+    private const double SurfaceBottomPadding = 50;
+    private const double CharacterHalfWidth = 84;
+    private const double CharacterScaleOriginY = 187;
     private readonly App _app;
     private readonly PetStateMachine _stateMachine = new();
     private readonly Dictionary<PetState, BitmapSource> _stateImages = new();
+    private readonly IFullscreenDetectionService _fullscreenDetectionService = new FullscreenDetectionService();
     private readonly DispatcherTimer _inactivityTimer;
     private readonly DispatcherTimer _positionSaveTimer;
+    private readonly DispatcherTimer _fullscreenTimer;
     private readonly Queue<DateTimeOffset> _recentClicks = new();
     private DateTimeOffset _lastInteraction = DateTimeOffset.Now;
     private Point _mouseDownPoint;
@@ -34,6 +44,7 @@ public partial class MainWindow : Window
     private int _mouseDownClickCount;
     private bool _loaded;
     private bool _isBusy;
+    private bool _hiddenForFullscreen;
     private CapturedScreenshot? _pendingScreenshot;
 
     public bool AllowClose { get; set; }
@@ -83,15 +94,18 @@ public partial class MainWindow : Window
             _positionSaveTimer.Stop();
             SavePosition();
         };
+        _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
+        _fullscreenTimer.Tick += FullscreenTimer_Tick;
 
         Loaded += MainWindow_Loaded;
         _inactivityTimer.Start();
+        _fullscreenTimer.Start();
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Topmost = _app.Settings.AlwaysOnTop;
-        TopmostMenuItem.IsChecked = Topmost;
+        UpdateTopmostIndicators();
         ApplyScale(_app.Settings.Scale, save: false);
         LoadCharacterAssets();
         RestorePosition();
@@ -149,18 +163,18 @@ public partial class MainWindow : Window
         var left = _app.Settings.Left;
         var top = _app.Settings.Top;
         if (left is not null && top is not null
-            && left >= SystemParameters.VirtualScreenLeft - Width + 80
+            && left >= SystemParameters.VirtualScreenLeft - LogicalSurfaceWidth + 80
             && left <= SystemParameters.VirtualScreenLeft + SystemParameters.VirtualScreenWidth - 80
-            && top >= SystemParameters.VirtualScreenTop - Height + 80
+            && top >= SystemParameters.VirtualScreenTop - LogicalSurfaceHeight + 80
             && top <= SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight - 80)
         {
-            Left = left.Value;
-            Top = top.Value;
+            Left = left.Value - SurfaceLeftPadding;
+            Top = top.Value - SurfaceTopPadding;
             return;
         }
 
-        Left = area.Right - Width - 24;
-        Top = area.Bottom - Height - 18;
+        Left = area.Right - LogicalSurfaceWidth - 24 - SurfaceLeftPadding;
+        Top = area.Bottom - LogicalSurfaceHeight - 18 - SurfaceTopPadding;
     }
 
     private void MarkInteraction()
@@ -288,7 +302,7 @@ public partial class MainWindow : Window
         }
 
         RegisterClick();
-        QuickBar.Visibility = QuickBar.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        ToggleQuickBar();
     }
 
     private async Task CompleteDragAsync()
@@ -459,11 +473,75 @@ public partial class MainWindow : Window
         scale = Math.Round(Math.Clamp(scale, 0.6, 2.0), 1);
         PetUserScaleTransform.ScaleX = scale;
         PetUserScaleTransform.ScaleY = scale;
+        UpdateFloatingUiLayout(scale);
         _app.Settings.Scale = scale;
         if (save)
         {
             _app.SettingsService.Save(_app.Settings);
         }
+    }
+
+    private void UpdateFloatingUiLayout(double scale)
+    {
+        var rightMargin = 180 + (CharacterHalfWidth * (scale - 1));
+        var quickBarTop = 86 - (CharacterScaleOriginY * (scale - 1)) + (24 * scale);
+        var quickBarScale = 0.92 + ((scale - 0.6) * 0.2);
+
+        var outerRightMargin = SurfaceRightPadding + rightMargin;
+        QuickBar.Margin = new Thickness(0, SurfaceTopPadding + quickBarTop, outerRightMargin, 0);
+        ChatBubble.Margin = new Thickness(0, 18, outerRightMargin, SurfaceBottomPadding + 26);
+        OnboardingBubble.Margin = new Thickness(0, 0, outerRightMargin, SurfaceBottomPadding + 26);
+
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+        QuickBarScaleTransform.ScaleX = quickBarScale;
+        QuickBarScaleTransform.ScaleY = quickBarScale;
+    }
+
+    private void ToggleQuickBar()
+    {
+        if (QuickBar.Visibility == Visibility.Visible)
+        {
+            HideQuickBar();
+            return;
+        }
+
+        ShowQuickBar();
+    }
+
+    private void ShowQuickBar()
+    {
+        QuickMoreButton.IsChecked = false;
+        QuickBar.Visibility = Visibility.Visible;
+        QuickBar.Opacity = 1;
+
+        QuickBar.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.Stop
+            });
+
+        var targetScale = QuickBarScaleTransform.ScaleX;
+        var scaleAnimation = new DoubleAnimation(targetScale * 0.9, targetScale, TimeSpan.FromMilliseconds(150))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, scaleAnimation);
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, scaleAnimation);
+    }
+
+    private void HideQuickBar()
+    {
+        QuickBar.BeginAnimation(OpacityProperty, null);
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+        QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+        QuickMorePopup.IsOpen = false;
+        QuickMoreButton.IsChecked = false;
+        QuickBar.Opacity = 0;
+        QuickBar.Visibility = Visibility.Collapsed;
     }
 
     private void ApplyStateVisual(PetState state)
@@ -577,7 +655,7 @@ public partial class MainWindow : Window
     private void ToggleChat()
     {
         ChatBubble.Visibility = ChatBubble.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
-        QuickBar.Visibility = Visibility.Collapsed;
+        HideQuickBar();
         if (ChatBubble.Visibility == Visibility.Visible)
         {
             PromptBox.Focus();
@@ -586,7 +664,11 @@ public partial class MainWindow : Window
 
     private void CloseChat_Click(object sender, RoutedEventArgs e) => ChatBubble.Visibility = Visibility.Collapsed;
 
-    private async void ScreenshotMenuItem_Click(object sender, RoutedEventArgs e) => await CaptureScreenshotAsync();
+    private async void ScreenshotMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        HideQuickBar();
+        await CaptureScreenshotAsync();
+    }
 
     private async Task CaptureScreenshotAsync()
     {
@@ -602,7 +684,7 @@ public partial class MainWindow : Window
         }
 
         SetBusy(true);
-        QuickBar.Visibility = Visibility.Collapsed;
+        HideQuickBar();
         OnboardingBubble.Visibility = Visibility.Collapsed;
         ScreenshotCaptureResult result;
         var restoreWindow = IsVisible;
@@ -665,7 +747,11 @@ public partial class MainWindow : Window
         await ReturnToIdleAsync();
     }
 
-    private async void ClipboardMenuItem_Click(object sender, RoutedEventArgs e) => await ReadClipboardAsync();
+    private async void ClipboardMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        HideQuickBar();
+        await ReadClipboardAsync();
+    }
 
     private async Task ReadClipboardAsync()
     {
@@ -701,7 +787,7 @@ public partial class MainWindow : Window
             case ClipboardContentKind.Text:
                 ClearPendingScreenshot();
                 ChatBubble.Visibility = Visibility.Visible;
-                QuickBar.Visibility = Visibility.Collapsed;
+                HideQuickBar();
                 ResponseText.Text = "剪贴板文字已放入输入框，确认后点击发送。";
                 PromptBox.Text = result.Text ?? string.Empty;
                 PromptBox.Focus();
@@ -750,7 +836,7 @@ public partial class MainWindow : Window
         ScreenshotDimensionsText.Text = $"{screenshot.Width} × {screenshot.Height} · {FormatByteCount(screenshot.ByteLength)}";
         ScreenshotPreviewPanel.Visibility = Visibility.Visible;
         ChatBubble.Visibility = Visibility.Visible;
-        QuickBar.Visibility = Visibility.Collapsed;
+        HideQuickBar();
         ResponseText.Text = readyMessage;
         PromptBox.Text = defaultPrompt;
         PromptBox.Focus();
@@ -796,7 +882,7 @@ public partial class MainWindow : Window
     private void ShowChatMessage(string message)
     {
         ChatBubble.Visibility = Visibility.Visible;
-        QuickBar.Visibility = Visibility.Collapsed;
+        HideQuickBar();
         ResponseText.Text = message;
         PromptBox.Focus();
     }
@@ -897,7 +983,7 @@ public partial class MainWindow : Window
         {
             _app.Settings = saved;
             Topmost = saved.AlwaysOnTop;
-            TopmostMenuItem.IsChecked = Topmost;
+            UpdateTopmostIndicators();
             ApplyScale(saved.Scale, save: false);
             _app.SettingsService.Save(saved);
             StartupService.SetEnabled(saved.StartWithWindows);
@@ -910,18 +996,32 @@ public partial class MainWindow : Window
 
     private void ChatMenuItem_Click(object sender, RoutedEventArgs e) => ToggleChat();
 
-    private void SettingsMenuItem_Click(object sender, RoutedEventArgs e) => OpenSettings();
+    private void SettingsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        HideQuickBar();
+        OpenSettings();
+    }
 
-    private void HideMenuItem_Click(object sender, RoutedEventArgs e) => Hide();
+    private void HideMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        HideFromUserRequest();
+    }
 
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e) => _app.ExitApplication();
 
     private void TopmostMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Topmost = !Topmost;
-        TopmostMenuItem.IsChecked = Topmost;
+        UpdateTopmostIndicators();
         _app.Settings.AlwaysOnTop = Topmost;
         _app.SettingsService.Save(_app.Settings);
+        HideQuickBar();
+    }
+
+    private void UpdateTopmostIndicators()
+    {
+        TopmostMenuItem.IsChecked = Topmost;
+        QuickTopmostButton.Content = Topmost ? "✓  始终置顶" : "○  始终置顶";
     }
 
     private void PetMenu_Closed(object sender, RoutedEventArgs e)
@@ -943,9 +1043,67 @@ public partial class MainWindow : Window
 
     private void SavePosition()
     {
-        _app.Settings.Left = Left;
-        _app.Settings.Top = Top;
+        _app.Settings.Left = Left + SurfaceLeftPadding;
+        _app.Settings.Top = Top + SurfaceTopPadding;
         _app.SettingsService.Save(_app.Settings);
+    }
+
+    private void Window_Deactivated(object? sender, EventArgs e) => HideQuickBar();
+
+    private void FullscreenTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_loaded)
+        {
+            return;
+        }
+
+        var shouldHide = _app.Settings.AutoHideInFullscreen
+            && _fullscreenDetectionService.IsForegroundWindowFullscreen();
+
+        if (shouldHide)
+        {
+            if (IsVisible)
+            {
+                _hiddenForFullscreen = true;
+                HideQuickBar();
+                Hide();
+            }
+
+            return;
+        }
+
+        if (!_hiddenForFullscreen)
+        {
+            return;
+        }
+
+        _hiddenForFullscreen = false;
+        var showActivated = ShowActivated;
+        try
+        {
+            ShowActivated = false;
+            Show();
+            WindowState = WindowState.Normal;
+        }
+        finally
+        {
+            ShowActivated = showActivated;
+        }
+    }
+
+    public void ShowFromUserRequest()
+    {
+        _hiddenForFullscreen = false;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    public void HideFromUserRequest()
+    {
+        _hiddenForFullscreen = false;
+        HideQuickBar();
+        Hide();
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -953,11 +1111,12 @@ public partial class MainWindow : Window
         SavePosition();
         if (AllowClose)
         {
+            _fullscreenTimer.Stop();
             ClearPendingScreenshot();
             return;
         }
 
         e.Cancel = true;
-        Hide();
+        HideFromUserRequest();
     }
 }

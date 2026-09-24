@@ -8,6 +8,7 @@ public sealed class AppSettings
     public double? Top { get; set; }
     public double Scale { get; set; } = 1.0;
     public bool AlwaysOnTop { get; set; } = true;
+    public bool AutoHideInFullscreen { get; set; } = true;
     public bool StartWithWindows { get; set; }
     public bool HasCompletedOnboarding { get; set; }
     public string Provider { get; set; } = "Offline";

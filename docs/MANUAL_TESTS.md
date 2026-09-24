@@ -3,12 +3,13 @@
 - Launch with no `data/settings.json`: the production pet and first-run mini guide appear; no API key is required.
 - Click “知道了”, restart, and confirm the guide does not reappear.
 - Hover the pet: the dedicated Hover sprite appears and the pet subtly enlarges.
-- Single-click: the quick bar toggles.
+- Single-click: the compact icon quick bar fades in beside the pet; tooltips and the More menu are readable.
 - Double-click: the compact chat bubble toggles.
 - Drag: the dedicated lifted sprite appears and the window follows the pointer.
 - Release outside the character or window: the pet changes to Happy, returns to Idle after about 0.9 seconds, and never remains Dragged.
 - Restart after dragging: the last valid position is restored.
 - Scroll over the pet: scale changes between 60% and 200% and persists.
+- At 200% scale and while hovering, the character, status bubble, chat bubble, onboarding bubble, quick bar, rounded corners, and shadows are not clipped.
 - Rapidly click five times: the dedicated Angry sprite is shown briefly.
 - Leave idle for five minutes: the dedicated Sleeping sprite is shown; hover wakes it.
 - Right-click: chat, always-on-top, settings, hide, and exit actions are available.
@@ -16,6 +17,9 @@
 - Launch the EXE a second time while hidden: the original process is restored and the second process exits.
 - Confirm the EXE, pet window, and tray use the dragon-girl icon.
 - Settings: provider fields, scale, topmost, and start-with-Windows save successfully.
+- The quick-bar More menu clearly shows `✓` or `○` for the current always-on-top state.
+- With fullscreen auto-hide enabled, an F11 browser or fullscreen game hides the pet within about one second and restores it without taking focus after leaving fullscreen.
+- A normally maximized window does not trigger fullscreen auto-hide; a pet hidden manually stays hidden after entering and leaving fullscreen.
 - Inspect `data/settings.json`: no plaintext API key is present.
 - Offline chat: sending a prompt gives a setup message instead of crashing.
 - Configured OpenAI-compatible endpoint: a prompt enters thinking, returns text, then enters happy.

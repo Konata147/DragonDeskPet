@@ -30,6 +30,7 @@ public partial class SettingsWindow : Window
         ApiKeyBox.Password = current.ApiKey;
         ScaleSlider.Value = current.Scale;
         AlwaysOnTopBox.IsChecked = current.AlwaysOnTop;
+        AutoHideInFullscreenBox.IsChecked = current.AutoHideInFullscreen;
         StartWithWindowsBox.IsChecked = current.StartWithWindows;
         UpdateScaleLabel(current.Scale);
         _initializing = false;
@@ -90,6 +91,7 @@ public partial class SettingsWindow : Window
             Top = _current.Top,
             Scale = Math.Round(ScaleSlider.Value, 1),
             AlwaysOnTop = AlwaysOnTopBox.IsChecked == true,
+            AutoHideInFullscreen = AutoHideInFullscreenBox.IsChecked == true,
             StartWithWindows = StartWithWindowsBox.IsChecked == true,
             HasCompletedOnboarding = _current.HasCompletedOnboarding,
             Provider = descriptor.Id,

@@ -49,7 +49,7 @@ public partial class App : Application
         MainWindow = mainWindow;
         _trayIcon = new TrayIconService(
             show: () => Dispatcher.Invoke(ShowPet),
-            hide: () => Dispatcher.Invoke(mainWindow.Hide),
+            hide: () => Dispatcher.Invoke(mainWindow.HideFromUserRequest),
             openSettings: () => Dispatcher.Invoke(mainWindow.OpenSettings),
             exit: () => Dispatcher.Invoke(ExitApplication),
             iconPath: AssetService.IconPath);
@@ -64,9 +64,10 @@ public partial class App : Application
             return;
         }
 
-        MainWindow.Show();
-        MainWindow.WindowState = WindowState.Normal;
-        MainWindow.Activate();
+        if (MainWindow is MainWindow window)
+        {
+            window.ShowFromUserRequest();
+        }
     }
 
     public void ExitApplication()

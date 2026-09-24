@@ -61,6 +61,14 @@
                                 ValueChanged="ScaleSlider_ValueChanged"
                                 Margin="0,4,0,12" />
                         <CheckBox x:Name="AlwaysOnTopBox" Content="始终置顶" Margin="0,5" />
+                        <CheckBox x:Name="AutoHideInFullscreenBox"
+                                  Content="全屏程序运行时自动隐藏"
+                                  Margin="0,5,0,1" />
+                        <TextBlock Text="离开全屏后自动恢复；手动隐藏时不会自动弹出。"
+                                   Margin="22,0,0,4"
+                                   FontSize="11"
+                                   Foreground="#887E96"
+                                   TextWrapping="Wrap" />
                         <CheckBox x:Name="StartWithWindowsBox" Content="登录 Windows 时自动启动" Margin="0,5" />
                     </StackPanel>
                 </Border>

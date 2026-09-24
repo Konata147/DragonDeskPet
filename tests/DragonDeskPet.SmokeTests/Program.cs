@@ -33,6 +33,26 @@ await RunAsync("state machine transitions exactly once", () =>
     return Task.CompletedTask;
 });
 
+await RunAsync("fullscreen detection recognizes complete monitor coverage", () =>
+{
+    var primaryMonitor = new Rectangle(0, 0, 1920, 1080);
+    var leftMonitor = new Rectangle(-1920, 0, 1920, 1080);
+
+    Assert(
+        FullscreenDetectionService.CoversMonitor(new Rectangle(0, 0, 1920, 1080), primaryMonitor),
+        "exact monitor coverage should count as fullscreen");
+    Assert(
+        FullscreenDetectionService.CoversMonitor(new Rectangle(-1928, -8, 1936, 1096), leftMonitor),
+        "overscan and negative monitor coordinates should count as fullscreen");
+    Assert(
+        !FullscreenDetectionService.CoversMonitor(new Rectangle(0, 0, 1920, 1040), primaryMonitor),
+        "a maximized work-area window should not count as fullscreen");
+    Assert(
+        !FullscreenDetectionService.CoversMonitor(new Rectangle(100, 100, 1200, 800), primaryMonitor),
+        "an ordinary window should not count as fullscreen");
+    return Task.CompletedTask;
+});
+
 await RunAsync("all seven state assets are mapped and transparent", () =>
 {
     var expectedNames = new Dictionary<PetState, string>
@@ -391,6 +411,7 @@ await RunAsync("legacy settings default onboarding to incomplete", () =>
         File.WriteAllText(service.SettingsPath, "{\"Scale\":1.1,\"Provider\":\"Offline\"}");
         var loaded = service.Load();
         Assert(!loaded.HasCompletedOnboarding, "legacy settings must default onboarding to false");
+        Assert(loaded.AutoHideInFullscreen, "legacy settings must default fullscreen auto-hide to true");
     }
     finally
     {
