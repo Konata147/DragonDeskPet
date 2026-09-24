@@ -5,6 +5,6 @@ public sealed class UnavailableAiProvider(string displayName, string message) : 
     public string DisplayName { get; } = displayName;
     public bool IsConfigured => false;
 
-    public Task<string> SendAsync(string prompt, CancellationToken cancellationToken = default) =>
+    public Task<string> SendAsync(AiRequest request, CancellationToken cancellationToken = default) =>
         Task.FromResult(message);
 }

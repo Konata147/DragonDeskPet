@@ -15,6 +15,8 @@
     <Window.Resources>
         <ContextMenu x:Key="PetMenu" Closed="PetMenu_Closed">
             <MenuItem Header="💬 和我聊天" Click="ChatMenuItem_Click" />
+            <MenuItem Header="📷 截图问我" Tag="Screenshot" Click="ScreenshotMenuItem_Click" />
+            <MenuItem Header="📋 剪贴板问我" Tag="Clipboard" Click="ClipboardMenuItem_Click" />
             <MenuItem Header="📌 始终置顶" IsCheckable="True" Tag="Topmost" Click="TopmostMenuItem_Click" />
             <Separator />
             <MenuItem Header="⚙ 设置" Click="SettingsMenuItem_Click" />
@@ -46,7 +48,7 @@
                            FontWeight="SemiBold"
                            Foreground="{StaticResource TextBrush}" />
                 <TextBlock Margin="0,9,0,10"
-                           Text="拖动我可以移动位置，滚轮调整大小，双击打开聊天，右键查看更多功能。"
+                           Text="拖动我可以移动位置，滚轮调整大小，双击打开聊天；截图、剪贴板和图片拖入都可以问我。"
                            TextWrapping="Wrap"
                            LineHeight="20"
                            Foreground="#514761" />
@@ -76,6 +78,7 @@
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -83,7 +86,46 @@
                     <TextBlock Text="小龙娘" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextBrush}" />
                     <Button DockPanel.Dock="Right" Content="×" Width="28" Height="24" Padding="0" Click="CloseChat_Click" />
                 </DockPanel>
-                <ScrollViewer Grid.Row="1" Margin="0,10,0,10" VerticalScrollBarVisibility="Auto">
+                <Border x:Name="ScreenshotPreviewPanel"
+                        Grid.Row="1"
+                        Margin="0,9,0,0"
+                        Padding="7"
+                        Background="#EEE8FA"
+                        BorderBrush="#CBBDF1"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Visibility="Collapsed">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="88" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="82" Height="56" Background="#DDD5EB" CornerRadius="7" ClipToBounds="True">
+                            <Image x:Name="ScreenshotPreviewImage"
+                                   Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="8,2,5,0">
+                            <TextBlock x:Name="PendingImageTitleText"
+                                       Text="待发送图片"
+                                       FontWeight="SemiBold"
+                                       Foreground="#403653"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="ScreenshotDimensionsText"
+                                       Margin="0,4,0,0"
+                                       FontSize="11"
+                                       Foreground="#716681" />
+                        </StackPanel>
+                        <Button x:Name="RemoveScreenshotButton"
+                                Grid.Column="2"
+                                Width="27" Height="27" Padding="0"
+                                ToolTip="移除截图"
+                                Content="×"
+                                Click="RemoveScreenshot_Click" />
+                    </Grid>
+                </Border>
+                <ScrollViewer Grid.Row="2" Margin="0,10,0,10" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="ResponseText"
                                Text="今天想让我帮你做什么？"
                                TextWrapping="Wrap"
@@ -91,7 +133,7 @@
                                FontSize="13"
                                LineHeight="20" />
                 </ScrollViewer>
-                <Grid Grid.Row="2">
+                <Grid Grid.Row="3">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -123,6 +165,8 @@
             <Border Background="#EFFFFFFF" CornerRadius="14" Padding="4">
                 <StackPanel Orientation="Horizontal">
                     <Button Content="聊天" Click="ChatMenuItem_Click" />
+                    <Button x:Name="QuickScreenshotButton" Content="截图" Click="ScreenshotMenuItem_Click" />
+                    <Button x:Name="QuickClipboardButton" Content="粘贴" Click="ClipboardMenuItem_Click" />
                     <Button Content="置顶" Click="TopmostMenuItem_Click" />
                     <Button Content="设置" Click="SettingsMenuItem_Click" />
                 </StackPanel>
@@ -131,6 +175,7 @@
 
         <Grid x:Name="CharacterHost"
               Width="168" Height="220"
+              AllowDrop="True"
               HorizontalAlignment="Right"
               VerticalAlignment="Bottom"
               Margin="0,0,0,4"
@@ -143,7 +188,11 @@
               MouseLeftButtonUp="CharacterHost_MouseLeftButtonUp"
               MouseMove="CharacterHost_MouseMove"
               MouseWheel="CharacterHost_MouseWheel"
-              MouseRightButtonUp="CharacterHost_MouseRightButtonUp">
+              MouseRightButtonUp="CharacterHost_MouseRightButtonUp"
+              DragEnter="CharacterHost_DragEnter"
+              DragOver="CharacterHost_DragOver"
+              DragLeave="CharacterHost_DragLeave"
+              Drop="CharacterHost_Drop">
             <Grid.RenderTransform>
                 <TransformGroup>
                     <ScaleTransform x:Name="PetUserScaleTransform" ScaleX="1" ScaleY="1" />

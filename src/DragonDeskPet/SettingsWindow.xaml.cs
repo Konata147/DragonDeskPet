@@ -46,7 +46,7 @@ public partial class SettingsWindow : Window
         ModelTextBox.Text = descriptor.DefaultModel;
         ValidationText.Text = descriptor.UsesOpenAiCompatibleTransport || descriptor.Id == "Offline"
             ? string.Empty
-            : "此提供商已预留在统一架构中，V0.1 暂未实现它的原生协议。";
+            : "此提供商已预留在统一架构中，V0.2 暂未实现它的原生协议。";
     }
 
     private void ScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

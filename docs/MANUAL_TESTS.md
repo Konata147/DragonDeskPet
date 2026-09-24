@@ -1,4 +1,4 @@
-# V0.1 manual test checklist
+# V0.2 manual test checklist
 
 - Launch with no `data/settings.json`: the production pet and first-run mini guide appear; no API key is required.
 - Click “知道了”, restart, and confirm the guide does not reappear.
@@ -19,4 +19,20 @@
 - Inspect `data/settings.json`: no plaintext API key is present.
 - Offline chat: sending a prompt gives a setup message instead of crashing.
 - Configured OpenAI-compatible endpoint: a prompt enters thinking, returns text, then enters happy.
+- Screenshot entry points: both the quick-bar button and the right-click item start region selection.
+- Screenshot privacy: the pet and chat bubble disappear before selection; no overlay or cursor appears in the captured preview.
+- Multi-monitor selection: primary, secondary, mixed-DPI, and negative-coordinate displays work; a drag cannot cross the starting display boundary.
+- Screenshot cancellation: Esc and right-click restore the pet without replacing an existing pending preview.
+- Screenshot validation: an area below 16×16 is rejected; an encoded PNG above 8 MiB asks for a smaller area.
+- Screenshot preview: dimensions and size are shown; the prompt remains editable; remove and reselect work.
+- Screenshot send: no request is made until Send is clicked; success clears the preview, while network/model errors retain it for retry.
+- Vision compatibility: a supported vision model receives the image; a model returning 400/415/422 shows a friendly unsupported-image message.
+- Offline/unconfigured provider: screenshot selection does not start and the chat bubble points to Settings.
+- Inspect the program folder, `data`, logs, and temp locations: no captured screenshot file is created.
+- Clipboard text: copy Unicode text, click “粘贴”, and confirm it fills the prompt without sending automatically.
+- Clipboard image: copy an image, click “粘贴”, and confirm a bounded PNG preview appears without disk output.
+- Clipboard empty/busy: an empty or temporarily locked clipboard produces a useful message and never crashes.
+- Drag one PNG/JPG/BMP/GIF/TIFF over the pet: the pointer shows Copy, the state label invites dropping, and a preview appears after release.
+- Drag multiple files or an unsupported file: the drop is rejected with a clear supported-format message.
+- Image failure retry: a failed provider request retains clipboard or dropped-image preview and prompt; success or manual removal clears it.
 - Inspect `data/logs` after a controlled diagnostic test: no more than ten `crash-*.txt` files remain and configured secrets are absent.

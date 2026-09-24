@@ -7,11 +7,15 @@ using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using DragonDeskPet.AI;
 using DragonDeskPet.Core;
 using DragonDeskPet.Services;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
+using DataFormats = System.Windows.DataFormats;
+using DragDropEffects = System.Windows.DragDropEffects;
+using DragEventArgs = System.Windows.DragEventArgs;
 
 namespace DragonDeskPet;
 
@@ -29,12 +33,22 @@ public partial class MainWindow : Window
     private bool _dragged;
     private int _mouseDownClickCount;
     private bool _loaded;
+    private bool _isBusy;
+    private CapturedScreenshot? _pendingScreenshot;
 
     public bool AllowClose { get; set; }
 
     private MenuItem TopmostMenuItem => ((ContextMenu)FindResource("PetMenu"))
         .Items.OfType<MenuItem>()
         .First(item => Equals(item.Tag, "Topmost"));
+
+    private MenuItem ScreenshotMenuItem => ((ContextMenu)FindResource("PetMenu"))
+        .Items.OfType<MenuItem>()
+        .First(item => Equals(item.Tag, "Screenshot"));
+
+    private MenuItem ClipboardMenuItem => ((ContextMenu)FindResource("PetMenu"))
+        .Items.OfType<MenuItem>()
+        .First(item => Equals(item.Tag, "Clipboard"));
 
     public MainWindow(App app)
     {
@@ -329,6 +343,117 @@ public partial class MainWindow : Window
         _stateMachine.TransitionTo(PetState.Hover);
     }
 
+    private void CharacterHost_DragEnter(object sender, DragEventArgs e) => UpdateImageDragFeedback(e);
+
+    private void CharacterHost_DragOver(object sender, DragEventArgs e) => UpdateImageDragFeedback(e);
+
+    private void UpdateImageDragFeedback(DragEventArgs e)
+    {
+        if (!_isBusy && HasFileDrop(e))
+        {
+            e.Effects = DragDropEffects.Copy;
+            _stateMachine.TransitionTo(PetState.Hover);
+            StateText.Text = TryGetDroppedImagePath(e, out _)
+                ? "松开让我看看"
+                : "松开检查文件";
+        }
+        else
+        {
+            e.Effects = DragDropEffects.None;
+        }
+
+        e.Handled = true;
+    }
+
+    private void CharacterHost_DragLeave(object sender, DragEventArgs e)
+    {
+        if (_stateMachine.Current == PetState.Hover)
+        {
+            _stateMachine.TransitionTo(PetState.Idle);
+        }
+    }
+
+    private async void CharacterHost_Drop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (_isBusy)
+        {
+            return;
+        }
+
+        if (!TryGetDroppedImagePath(e, out var path))
+        {
+            ShowChatMessage("请一次拖入一张 PNG、JPG、BMP、GIF 或 TIFF 图片。");
+            _stateMachine.TransitionTo(PetState.Angry);
+            await ReturnToIdleAsync(1400);
+            return;
+        }
+
+        if (!EnsureAiConfigured())
+        {
+            return;
+        }
+
+        MarkInteraction();
+        SetBusy(true);
+        try
+        {
+            var image = await _app.ImageFileService.LoadAsync(path);
+            try
+            {
+                PresentPendingImage(
+                    image,
+                    $"拖入图片 · {Path.GetFileName(path)}",
+                    "请分析这张图片，告诉我重点内容。",
+                    "图片准备好了。确认问题后点击发送，我才会上传它。");
+            }
+            catch
+            {
+                image.Dispose();
+                throw;
+            }
+
+            _stateMachine.TransitionTo(PetState.Happy);
+            await ReturnToIdleAsync();
+        }
+        catch (ScreenshotImageTooLargeException)
+        {
+            ShowChatMessage("图片转换为 PNG 后超过 8 MB，请选择更小的图片。");
+            _stateMachine.TransitionTo(PetState.Angry);
+            await ReturnToIdleAsync(1400);
+        }
+        catch (OperationCanceledException)
+        {
+            _stateMachine.TransitionTo(PetState.Idle);
+        }
+        catch (Exception ex)
+        {
+            ShowChatMessage($"图片无法读取：{ex.Message}");
+            _stateMachine.TransitionTo(PetState.Angry);
+            await ReturnToIdleAsync(1400);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private bool TryGetDroppedImagePath(DragEventArgs e, out string path)
+    {
+        path = string.Empty;
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)
+            || e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: 1 } paths)
+        {
+            return false;
+        }
+
+        path = paths[0];
+        return _app.ImageFileService.CanLoad(path);
+    }
+
+    private static bool HasFileDrop(DragEventArgs e) =>
+        e.Data.GetDataPresent(DataFormats.FileDrop);
+
     private void ApplyScale(double scale, bool save)
     {
         scale = Math.Round(Math.Clamp(scale, 0.6, 2.0), 1);
@@ -461,6 +586,247 @@ public partial class MainWindow : Window
 
     private void CloseChat_Click(object sender, RoutedEventArgs e) => ChatBubble.Visibility = Visibility.Collapsed;
 
+    private async void ScreenshotMenuItem_Click(object sender, RoutedEventArgs e) => await CaptureScreenshotAsync();
+
+    private async Task CaptureScreenshotAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        MarkInteraction();
+        if (!EnsureAiConfigured())
+        {
+            return;
+        }
+
+        SetBusy(true);
+        QuickBar.Visibility = Visibility.Collapsed;
+        OnboardingBubble.Visibility = Visibility.Collapsed;
+        ScreenshotCaptureResult result;
+        var restoreWindow = IsVisible;
+        try
+        {
+            if (restoreWindow)
+            {
+                Hide();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                await Task.Delay(120);
+            }
+
+            result = await _app.ScreenshotCaptureService.CaptureRegionAsync();
+        }
+        catch (Exception ex)
+        {
+            result = ScreenshotCaptureResult.Failed($"截图没有完成：{ex.Message}");
+        }
+        finally
+        {
+            if (restoreWindow)
+            {
+                Show();
+                WindowState = WindowState.Normal;
+                Activate();
+            }
+
+            SetBusy(false);
+        }
+
+        if (result.Status == ScreenshotCaptureStatus.Canceled)
+        {
+            return;
+        }
+
+        if (result.Status == ScreenshotCaptureStatus.Failed || result.Screenshot is null)
+        {
+            ShowChatMessage(result.ErrorMessage ?? "截图没有完成，请重试。");
+            _stateMachine.TransitionTo(PetState.Angry);
+            await ReturnToIdleAsync(1400);
+            return;
+        }
+
+        try
+        {
+            PresentPendingImage(
+                result.Screenshot,
+                "待发送截图",
+                "请分析这张截图，告诉我重点内容。",
+                "截图准备好了。确认问题后点击发送，我才会把它交给当前 AI。");
+        }
+        catch
+        {
+            result.Screenshot.Dispose();
+            ShowChatMessage("截图预览无法读取，请重新选择区域。");
+            return;
+        }
+
+        _stateMachine.TransitionTo(PetState.Happy);
+        await ReturnToIdleAsync();
+    }
+
+    private async void ClipboardMenuItem_Click(object sender, RoutedEventArgs e) => await ReadClipboardAsync();
+
+    private async Task ReadClipboardAsync()
+    {
+        if (_isBusy || !EnsureAiConfigured())
+        {
+            return;
+        }
+
+        MarkInteraction();
+        SetBusy(true);
+        ClipboardContentResult result;
+        try
+        {
+            result = await _app.ClipboardContentService.ReadAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            result = new ClipboardContentResult(
+                ClipboardContentKind.Failed,
+                ErrorMessage: $"剪贴板读取失败：{ex.Message}");
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+
+        switch (result.Kind)
+        {
+            case ClipboardContentKind.Text:
+                ClearPendingScreenshot();
+                ChatBubble.Visibility = Visibility.Visible;
+                QuickBar.Visibility = Visibility.Collapsed;
+                ResponseText.Text = "剪贴板文字已放入输入框，确认后点击发送。";
+                PromptBox.Text = result.Text ?? string.Empty;
+                PromptBox.Focus();
+                PromptBox.SelectAll();
+                break;
+
+            case ClipboardContentKind.Image when result.Image is not null:
+                try
+                {
+                    PresentPendingImage(
+                        result.Image,
+                        "剪贴板图片",
+                        "请分析这张图片，告诉我重点内容。",
+                        "剪贴板图片准备好了。确认问题后点击发送，我才会上传它。");
+                    _stateMachine.TransitionTo(PetState.Happy);
+                    await ReturnToIdleAsync();
+                }
+                catch
+                {
+                    result.Image.Dispose();
+                    ShowChatMessage("剪贴板图片预览无法读取，请重新复制后再试。");
+                }
+                break;
+
+            case ClipboardContentKind.Empty:
+                ShowChatMessage("剪贴板里没有可用的文字或图片。请先复制内容后再试。");
+                break;
+
+            case ClipboardContentKind.Failed:
+                ShowChatMessage(result.ErrorMessage ?? "剪贴板内容暂时无法读取。");
+                break;
+        }
+    }
+
+    private void PresentPendingImage(
+        CapturedScreenshot screenshot,
+        string title,
+        string defaultPrompt,
+        string readyMessage)
+    {
+        var preview = LoadBitmap(screenshot.PngBytes);
+        ClearPendingScreenshot();
+        _pendingScreenshot = screenshot;
+        ScreenshotPreviewImage.Source = preview;
+        PendingImageTitleText.Text = title;
+        ScreenshotDimensionsText.Text = $"{screenshot.Width} × {screenshot.Height} · {FormatByteCount(screenshot.ByteLength)}";
+        ScreenshotPreviewPanel.Visibility = Visibility.Visible;
+        ChatBubble.Visibility = Visibility.Visible;
+        QuickBar.Visibility = Visibility.Collapsed;
+        ResponseText.Text = readyMessage;
+        PromptBox.Text = defaultPrompt;
+        PromptBox.Focus();
+        PromptBox.SelectAll();
+    }
+
+    private static BitmapSource LoadBitmap(ReadOnlyMemory<byte> bytes)
+    {
+        using var stream = new MemoryStream(bytes.ToArray(), writable: false);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    private static string FormatByteCount(int bytes) =>
+        bytes >= 1024 * 1024
+            ? $"{bytes / (1024d * 1024d):0.0} MB"
+            : $"{Math.Max(1, bytes / 1024d):0.#} KB";
+
+    private void RemoveScreenshot_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_isBusy)
+        {
+            ClearPendingScreenshot();
+            ResponseText.Text = "图片已移除。你仍然可以发送纯文字问题。";
+        }
+    }
+
+    private void ClearPendingScreenshot()
+    {
+        _pendingScreenshot?.Dispose();
+        _pendingScreenshot = null;
+        ScreenshotPreviewImage.Source = null;
+        PendingImageTitleText.Text = "待发送图片";
+        ScreenshotDimensionsText.Text = string.Empty;
+        ScreenshotPreviewPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowChatMessage(string message)
+    {
+        ChatBubble.Visibility = Visibility.Visible;
+        QuickBar.Visibility = Visibility.Collapsed;
+        ResponseText.Text = message;
+        PromptBox.Focus();
+    }
+
+    private bool EnsureAiConfigured()
+    {
+        var provider = _app.AiProviderFactory.Create(_app.Settings);
+        if (provider.IsConfigured)
+        {
+            return true;
+        }
+
+        ShowChatMessage($"{provider.DisplayName} 尚未配置可用。请先打开设置，选择 OpenAI-compatible 服务并填写模型信息。");
+        _stateMachine.TransitionTo(PetState.Angry);
+        _ = ReturnToIdleAsync(1400);
+        return false;
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _isBusy = busy;
+        SendButton.IsEnabled = !busy;
+        PromptBox.IsEnabled = !busy;
+        QuickScreenshotButton.IsEnabled = !busy;
+        QuickClipboardButton.IsEnabled = !busy;
+        ScreenshotMenuItem.IsEnabled = !busy;
+        ClipboardMenuItem.IsEnabled = !busy;
+        RemoveScreenshotButton.IsEnabled = !busy;
+    }
+
     private void OnboardingDone_Click(object sender, RoutedEventArgs e)
     {
         _app.Settings.HasCompletedOnboarding = true;
@@ -482,21 +848,28 @@ public partial class MainWindow : Window
     private async Task SendPromptAsync()
     {
         var prompt = PromptBox.Text.Trim();
-        if (prompt.Length == 0 || !SendButton.IsEnabled)
+        if (prompt.Length == 0 || _isBusy)
         {
             return;
         }
 
         MarkInteraction();
-        PromptBox.Clear();
-        SendButton.IsEnabled = false;
+        var pendingScreenshot = _pendingScreenshot;
+        var request = new AiRequest(prompt, pendingScreenshot?.CreateAttachment());
+        SetBusy(true);
         ResponseText.Text = "让我想想……";
         _stateMachine.TransitionTo(PetState.Thinking);
 
         try
         {
             var provider = _app.AiProviderFactory.Create(_app.Settings);
-            ResponseText.Text = await provider.SendAsync(prompt);
+            ResponseText.Text = await provider.SendAsync(request);
+            PromptBox.Clear();
+            if (ReferenceEquals(_pendingScreenshot, pendingScreenshot))
+            {
+                ClearPendingScreenshot();
+            }
+
             _stateMachine.TransitionTo(PetState.Happy);
             await ReturnToIdleAsync(1300);
         }
@@ -513,7 +886,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            SendButton.IsEnabled = true;
+            SetBusy(false);
         }
     }
 
@@ -580,6 +953,7 @@ public partial class MainWindow : Window
         SavePosition();
         if (AllowClose)
         {
+            ClearPendingScreenshot();
             return;
         }
 

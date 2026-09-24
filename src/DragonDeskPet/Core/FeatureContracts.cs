@@ -1,20 +1,29 @@
 namespace DragonDeskPet.Core;
 
-// Extension seams for later milestones. V0.1 intentionally ships no implementations.
-public interface IScreenshotAssistant
+// Extension seams reserved for later milestones.
+public enum ClipboardContentKind
 {
-    Task HandleScreenshotAsync(CancellationToken cancellationToken = default);
+    Empty,
+    Text,
+    Image,
+    Failed
 }
 
-public interface IClipboardAssistant
+public sealed record ClipboardContentResult(
+    ClipboardContentKind Kind,
+    string? Text = null,
+    CapturedScreenshot? Image = null,
+    string? ErrorMessage = null);
+
+public interface IClipboardContentService
 {
-    Task HandleClipboardAsync(CancellationToken cancellationToken = default);
+    Task<ClipboardContentResult> ReadAsync(CancellationToken cancellationToken = default);
 }
 
-public interface IDropPayloadHandler
+public interface IImageFileService
 {
-    bool CanHandle(IReadOnlyList<string> paths);
-    Task HandleAsync(IReadOnlyList<string> paths, CancellationToken cancellationToken = default);
+    bool CanLoad(string path);
+    Task<CapturedScreenshot> LoadAsync(string path, CancellationToken cancellationToken = default);
 }
 
 public interface IReminderService

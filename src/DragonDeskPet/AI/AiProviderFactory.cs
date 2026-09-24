@@ -16,7 +16,7 @@ public sealed class AiProviderFactory
         {
             return new UnavailableAiProvider(
                 descriptor.DisplayName,
-                $"{descriptor.DisplayName} 已纳入 Provider 架构，原生协议会在后续版本接入；V0.1 可先使用 OpenAI-compatible 服务。");
+                $"{descriptor.DisplayName} 已纳入 Provider 架构，原生协议会在后续版本接入；V0.2 可先使用 OpenAI-compatible 服务。");
         }
 
         var baseUrl = string.IsNullOrWhiteSpace(settings.BaseUrl) ? descriptor.DefaultBaseUrl : settings.BaseUrl.Trim();

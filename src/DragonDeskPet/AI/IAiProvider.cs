@@ -4,5 +4,5 @@ public interface IAiProvider
 {
     string DisplayName { get; }
     bool IsConfigured { get; }
-    Task<string> SendAsync(string prompt, CancellationToken cancellationToken = default);
+    Task<string> SendAsync(AiRequest request, CancellationToken cancellationToken = default);
 }

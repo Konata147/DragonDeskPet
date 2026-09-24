@@ -2,6 +2,7 @@
 using System.Data;
 using System.Windows;
 using DragonDeskPet.AI;
+using DragonDeskPet.Core;
 using DragonDeskPet.Services;
 using Application = System.Windows.Application;
 
@@ -20,6 +21,9 @@ public partial class App : Application
     public AppSettings Settings { get; set; } = new();
     public SettingsService SettingsService { get; } = new();
     public AiProviderFactory AiProviderFactory { get; } = new();
+    public IScreenshotCaptureService ScreenshotCaptureService { get; } = new ScreenshotCaptureService();
+    public IClipboardContentService ClipboardContentService { get; } = new ClipboardContentService();
+    public IImageFileService ImageFileService { get; } = new ImageFileService();
 
     protected override void OnStartup(StartupEventArgs e)
     {
