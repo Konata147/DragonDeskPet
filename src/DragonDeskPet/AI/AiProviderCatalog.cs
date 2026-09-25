@@ -10,7 +10,7 @@ public static class AiProviderCatalog
         new("Anthropic", "Anthropic Claude", "https://api.anthropic.com", "claude-sonnet-4-5", false, true),
         new("DeepSeek", "DeepSeek", "https://api.deepseek.com", "deepseek-flash", true, true),
         new("OpenRouter", "OpenRouter", "https://openrouter.ai/api/v1", "openai/gpt-4.1-mini", true, true),
-        new("Ollama", "Ollama（本地）", "http://localhost:11434/v1", "qwen3:8b", true, false),
+        new("Ollama", "Ollama（本地免费，无需密钥）", "http://localhost:11434/v1", "qwen2.5vl:3b", true, false),
         new("LMStudio", "LM Studio（本地）", "http://localhost:1234/v1", "local-model", true, false),
         new("Custom", "自定义 OpenAI-compatible API", "", "", true, false)
     ];

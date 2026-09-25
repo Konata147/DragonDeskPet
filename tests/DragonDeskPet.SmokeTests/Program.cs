@@ -33,6 +33,91 @@ await RunAsync("state machine transitions exactly once", () =>
     return Task.CompletedTask;
 });
 
+await RunAsync("stale feedback cannot reset a second active drag", () =>
+{
+    var machine = new PetStateMachine();
+    machine.TransitionTo(PetState.Dragged);
+    machine.TransitionTo(PetState.Happy);
+    var firstDropRevision = machine.Revision;
+    machine.TransitionTo(PetState.Dragged);
+    Assert(!machine.TryFinishFeedback(firstDropRevision), "first drop timeout must not reset the second drag");
+    Assert(machine.Current == PetState.Dragged, "second drag must keep its dragged pose");
+    machine.TransitionTo(PetState.Happy);
+    var secondDropRevision = machine.Revision;
+    Assert(!machine.TryFinishFeedback(firstDropRevision), "first drop timeout must not shorten the second happy feedback");
+    Assert(machine.TryFinishFeedback(secondDropRevision) && machine.Current == PetState.Idle, "latest drop timeout should restore idle");
+    return Task.CompletedTask;
+});
+
+await RunAsync("feedback returns to hover when the pointer still rests on the pet", () =>
+{
+    var machine = new PetStateMachine();
+    machine.TransitionTo(PetState.Happy);
+    var revision = machine.Revision;
+    Assert(machine.TryFinishFeedback(revision, pointerOverCharacter: true), "current feedback should finish");
+    Assert(machine.Current == PetState.Hover, "hovered pet should not remain idle after feedback");
+    return Task.CompletedTask;
+});
+
+await RunAsync("pet placement keeps the transformed character inside the chosen monitor", () =>
+{
+    var screen = new Rectangle(0, 0, 1706, 1019);
+    var character = new Rectangle(465, 166, 303, 397);
+    var right = PetPlacement.ClampWindowTopLeft(new Point(1200, 300), character, screen, 8);
+    Assert(right.X + character.Right == screen.Right - 8, "dragging right should keep the entire character visible");
+    Assert(right.Y == 300, "horizontal clamping should preserve the vertical position");
+
+    var topLeft = PetPlacement.ClampWindowTopLeft(new Point(-2000, -2000), character, screen, 8);
+    Assert(topLeft.X + character.Left == 8 && topLeft.Y + character.Top == 8,
+        "dragging beyond the top-left should stop at the character edge, not snap to the center");
+
+    var unchanged = PetPlacement.ClampWindowTopLeft(new Point(100, 200), character, screen, 8);
+    Assert(unchanged == new Point(100, 200), "positions that are already visible should not move");
+
+    var leftMonitor = new Rectangle(-1920, 0, 1920, 1080);
+    var negativeScreen = PetPlacement.ClampWindowTopLeft(new Point(-3000, 200), character, leftMonitor, 8);
+    Assert(negativeScreen.X + character.Left == leftMonitor.Left + 8,
+        "a monitor with negative coordinates should use its own left edge");
+    return Task.CompletedTask;
+});
+
+await RunAsync("pet placement excludes transparent art padding", () =>
+{
+    var pixels = new byte[4 * 4 * 4];
+    pixels[(1 * 4 + 1) * 4 + 3] = 255;
+    pixels[(3 * 4 + 2) * 4 + 3] = 255;
+    var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(
+        4, 4, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, pixels, 16);
+    var opaque = CharacterArtworkBounds.FindOpaqueNormalizedBounds(bitmap);
+    Assert(opaque.Left == 0.25 && opaque.Top == 0.25 && opaque.Right == 0.75 && opaque.Bottom == 1,
+        "alpha bounds should exclude fully transparent pixels");
+    var fitted = CharacterArtworkBounds.FitNormalizedBounds(
+        opaque, new System.Windows.Size(168, 220), new System.Windows.Size(4, 4));
+    Assert(fitted.Left == 42 && fitted.Top == 68 && fitted.Right == 126 && fitted.Bottom == 194,
+        "image letterboxing and the opaque rectangle should both affect the visible edge");
+    return Task.CompletedTask;
+});
+
+await RunAsync("pet may cross an edge by half but cannot disappear", () =>
+{
+    var screen = new Rectangle(0, 0, 1706, 1019);
+    var character = new Rectangle(465, 166, 303, 397);
+    var right = PetPlacement.ClampWindowTopLeft(new Point(4000, 300), character, screen, 8, 0.5);
+    var visibleRightWidth = screen.Right - 8 - (right.X + character.Left);
+    Assert(visibleRightWidth >= character.Width / 2.0 && visibleRightWidth < character.Width / 2.0 + 2,
+        "right edge should leave half the artwork visible without an extra gap");
+
+    var topLeft = PetPlacement.ClampWindowTopLeft(new Point(-4000, -4000), character, screen, 8, 0.5);
+    var visibleLeftWidth = topLeft.X + character.Right - (screen.Left + 8);
+    var visibleTopHeight = topLeft.Y + character.Bottom - (screen.Top + 8);
+    Assert(visibleLeftWidth >= character.Width / 2.0 && visibleTopHeight >= character.Height / 2.0,
+        "even at a corner at least half remains visible on each axis");
+
+    var unchanged = PetPlacement.ClampWindowTopLeft(new Point(400, 200), character, screen, 8, 0.5);
+    Assert(unchanged == new Point(400, 200), "positions away from an edge should not snap");
+    return Task.CompletedTask;
+});
+
 await RunAsync("fullscreen detection recognizes complete monitor coverage", () =>
 {
     var primaryMonitor = new Rectangle(0, 0, 1920, 1080);
@@ -77,6 +162,24 @@ await RunAsync("all seven state assets are mapped and transparent", () =>
         Assert(bitmap.GetPixel(0, 0).A == 0, $"{expectedName} top-left corner must be transparent");
     }
 
+    return Task.CompletedTask;
+});
+
+await RunAsync("state artwork union leaves only true transparent padding", () =>
+{
+    var union = System.Windows.Rect.Empty;
+    foreach (var state in Enum.GetValues<PetState>())
+    {
+        var image = new System.Windows.Media.Imaging.BitmapImage(new Uri(AssetService.GetCharacterPath(state)));
+        union.Union(CharacterArtworkBounds.FindOpaqueNormalizedBounds(image));
+    }
+
+    Assert(union.Left > 0.02 && union.Top > 0 && union.Right < 0.98 && union.Bottom < 1,
+        "the seven states should share a bounded, nontransparent artwork region");
+    var fitted = CharacterArtworkBounds.FitNormalizedBounds(
+        union, new System.Windows.Size(168, 220), new System.Windows.Size(1241, 1268));
+    Assert(fitted.Left > 0 && fitted.Top > 0 && fitted.Right < 168 && fitted.Bottom < 220,
+        "character placement should not use the full image element rectangle");
     return Task.CompletedTask;
 });
 
@@ -127,6 +230,9 @@ await RunAsync("provider catalog keeps the planned providers", () =>
     var deepSeek = AiProviderCatalog.Find("DeepSeek");
     Assert(deepSeek.DefaultModel == "deepseek-flash", "DeepSeek should default to its vision-capable model");
     Assert(deepSeek.DefaultBaseUrl == "https://api.deepseek.com", "DeepSeek should use the documented API base URL");
+    var ollama = AiProviderCatalog.Find("Ollama");
+    Assert(!ollama.RequiresApiKey, "Ollama should remain available without an API key");
+    Assert(ollama.DefaultModel == "qwen2.5vl:3b", "Ollama should default to a lightweight vision model");
 
     return Task.CompletedTask;
 });
@@ -480,6 +586,406 @@ await RunAsync("crash logs redact secrets and retain only ten", () =>
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("strict reminder commands stay local and require unambiguous time", () =>
+{
+    var now = new DateTimeOffset(2026, 9, 24, 10, 0, 0, TimeSpan.FromHours(8));
+    Assert(ReminderCommandParser.TryParse("20分钟后提醒我休息", now, out var relative, out _), "relative reminder should parse");
+    Assert(relative?.Message == "休息" && relative.DueUtc == now.AddMinutes(20).ToUniversalTime(), "relative reminder should use the exact delay");
+    Assert(ReminderCommandParser.TryParse("明天 8:30 提醒我上课", now, out var tomorrow, out _), "tomorrow reminder should parse");
+    Assert(TimeZoneInfo.ConvertTime(tomorrow!.DueUtc, TimeZoneInfo.Local).Hour == 8, "tomorrow reminder should retain local clock time");
+    Assert(ReminderCommandParser.TryParse("每天 22:00 提醒我吃药", now, out var daily, out _), "daily reminder should parse");
+    Assert(daily?.Repeat == ReminderRepeat.Daily && daily.DailyLocalTime == new TimeOnly(22, 0), "daily recurrence should be explicit");
+    Assert(!ReminderCommandParser.TryParse("下课后提醒我交作业", now, out _, out var error), "ambiguous reminder should not be guessed");
+    Assert(!string.IsNullOrWhiteSpace(error), "ambiguous reminder should explain the form fallback");
+    return Task.CompletedTask;
+});
+
+await RunAsync("reminders recover overdue items and support daily and snooze", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var service = new ReminderService(store);
+        var now = DateTimeOffset.UtcNow;
+        service.Create(new ReminderDraft("one time", ReminderRepeat.None, now.AddMinutes(-3)));
+        service.Create(new ReminderDraft("daily", ReminderRepeat.Daily, now.AddMinutes(-2), TimeOnly.FromDateTime(DateTime.Now.AddHours(1))));
+        service.Tick(now);
+        var pending = service.GetPendingAlerts(now);
+        Assert(pending.Count == 2, "both overdue reminders should enter the pending queue");
+        Assert(service.GetReminders().Count(item => item.IsEnabled) == 1, "only the daily reminder should remain enabled");
+        service.Snooze(pending[0].Id, TimeSpan.FromMinutes(10), now);
+        Assert(service.GetPendingAlerts(now).Count == 1, "snoozed reminder should be hidden until it is due again");
+        Assert(service.GetPendingAlerts(now.AddMinutes(11)).Count == 2, "snoozed reminder should return after its delay");
+
+        var reloaded = new ProductivityStore(directory);
+        Assert(reloaded.Data.PendingAlerts.Count == 2, "pending alerts should survive restart");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("todo rollover and seven day archive cleanup are deterministic", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        store.Data.Todos.Add(new TodoItem { Text = "roll", AssignedDate = today.AddDays(-1) });
+        store.Data.Todos.Add(new TodoItem { Text = "old complete", AssignedDate = today.AddDays(-9), IsCompleted = true, CompletedUtc = DateTimeOffset.UtcNow.AddDays(-8) });
+        store.Data.Todos.Add(new TodoItem { Text = "recent complete", AssignedDate = today.AddDays(-2), IsCompleted = true, CompletedUtc = DateTimeOffset.UtcNow.AddDays(-2) });
+        store.NormalizeForToday(today);
+        Assert(store.Data.Todos.Single(item => item.Text == "roll").AssignedDate == today, "unfinished todo should roll into today");
+        Assert(store.Data.Todos.All(item => item.Text != "old complete"), "completed todo older than seven days should be removed");
+        Assert(store.Data.Todos.Any(item => item.Text == "recent complete"), "recent completed todo should remain archived");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("todo text editing persists without changing completion state", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var todos = new TodoService(store);
+        var item = todos.Add("清单测试", DateOnly.FromDateTime(DateTime.Today));
+        todos.SetCompleted(item.Id, true, DateTimeOffset.UtcNow);
+        todos.Update(item.Id, "修改后的清单测试");
+        var saved = new ProductivityStore(directory).Data.Todos.Single();
+        Assert(saved.Text == "修改后的清单测试" && saved.IsCompleted && saved.Id == item.Id,
+            "editing should persist text while keeping the same todo and completion state");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("pomodoro pauses, restores and enters a long break after four rounds", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var settings = new AppSettings { PomodoroFocusMinutes = 25, PomodoroShortBreakMinutes = 5, PomodoroLongBreakMinutes = 15, PomodoroRoundsBeforeLongBreak = 4 };
+        var store = new ProductivityStore(directory);
+        var service = new PomodoroService(store, () => settings);
+        var now = DateTimeOffset.UtcNow;
+        service.Start(now);
+        service.Pause(now.AddMinutes(5));
+        Assert(service.State.IsPaused && Math.Abs(service.State.PausedRemaining.TotalMinutes - 20) < 0.1, "pause should persist the remaining duration");
+        service.Resume(now.AddMinutes(10));
+        Assert(service.State.IsRunning, "resume should restart the current phase");
+        service.State.CompletedFocusRounds = 3;
+        service.State.EndsAtUtc = now.AddMinutes(9);
+        service.Tick(now.AddMinutes(10));
+        Assert(service.State.Phase == PomodoroPhase.LongBreak, "fourth focus round should select a long break");
+        Assert(service.State.IsAwaitingNextPhase && !service.State.IsRunning, "next phase must wait for user confirmation");
+        var reloaded = new ProductivityStore(directory);
+        Assert(reloaded.Data.Pomodoro.IsAwaitingNextPhase, "pomodoro transition state should survive restart");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("custom focus minutes persist and apply only to the next session", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var settingsService = new SettingsService(directory);
+        var settings = settingsService.Load();
+        settings.PomodoroFocusMinutes = 42;
+        settingsService.Save(settings);
+        settings = settingsService.Load();
+        Assert(settings.PomodoroFocusMinutes == 42, "custom focus length should persist in settings");
+
+        var service = new PomodoroService(new ProductivityStore(directory), () => settings);
+        var now = DateTimeOffset.UtcNow;
+        service.Start(now);
+        Assert(service.GetRemaining(now) == TimeSpan.FromMinutes(42), "new focus should use custom length");
+        settings.PomodoroFocusMinutes = 17;
+        settingsService.Save(settings);
+        Assert(service.GetRemaining(now) == TimeSpan.FromMinutes(42), "changing length must not shorten an active focus");
+        service.Cancel();
+        service.Start(now);
+        Assert(service.GetRemaining(now) == TimeSpan.FromMinutes(17), "next focus should use updated length");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("course schedule respects teaching week parity and skipped dates", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        store.Data.Semester.StartDate = new DateOnly(2026, 9, 7);
+        var service = new CourseScheduleService(store);
+        var course = new CourseItem
+        {
+            Name = "高数",
+            DayOfWeek = DayOfWeek.Monday,
+            StartTime = new TimeOnly(8, 0),
+            EndTime = new TimeOnly(9, 40),
+            StartWeek = 1,
+            EndWeek = 16,
+            WeekPattern = CourseWeekPattern.Odd,
+            ReminderMinutes = 30
+        };
+        service.AddOrUpdate(course);
+        Assert(service.GetTeachingWeek(new DateOnly(2026, 9, 7)) == 1, "semester start should be teaching week one");
+        Assert(service.GetCoursesForDate(new DateOnly(2026, 9, 7)).Count == 1, "odd-week course should appear in week one");
+        Assert(service.GetCoursesForDate(new DateOnly(2026, 9, 14)).Count == 0, "odd-week course should not appear in week two");
+        service.SkipDate(course.Id, new DateOnly(2026, 9, 21));
+        Assert(service.GetCoursesForDate(new DateOnly(2026, 9, 21)).Count == 0, "single-day cancellation should exclude that occurrence");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("CSV import previews without writing and applies merge only after confirmation", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        Directory.CreateDirectory(directory);
+        var csv = Path.Combine(directory, "courses.csv");
+        File.WriteAllText(csv, "课程名,星期,上课时间,下课时间,地点,教师,开始周,结束周,周次规则,提前提醒分钟,是否启用\n\"大学英语\",三,14:00,15:40,\"B楼,203\",李老师,1,16,单周,20,是", new UTF8Encoding(false));
+        var store = new ProductivityStore(directory);
+        var importer = new CourseScheduleImporter(store);
+        var preview = importer.Preview(csv, store.Data.Courses, store.Data.Semester);
+        Assert(preview.AddedCount == 1 && preview.InvalidCount == 0, "valid quoted CSV row should preview as one addition");
+        var displayed = new DragonDeskPet.CourseImportDisplayRow(preview.Rows[0]);
+        Assert(displayed.ScheduleText.Contains("星期三 14:00–15:40") && displayed.ScheduleText.Contains("单周"),
+            "import preview should show the course time and week pattern");
+        Assert(displayed.LocationTeacherText.Contains("B楼,203") && displayed.LocationTeacherText.Contains("李老师"),
+            "import preview should show the location and teacher");
+        Assert(store.Data.Courses.Count == 0 && !File.Exists(store.DataPath), "preview must not persist imported records");
+        importer.Apply(preview, false);
+        Assert(store.Data.Courses.Count == 1 && store.Data.Courses[0].Location == "B楼,203", "confirmed merge should preserve escaped CSV fields");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("replace import with no valid courses preserves the existing schedule", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var existing = new CourseItem
+        {
+            Name = "已保存课程",
+            DayOfWeek = DayOfWeek.Monday,
+            StartTime = new TimeOnly(8, 0),
+            EndTime = new TimeOnly(9, 40)
+        };
+        store.Data.Courses.Add(existing);
+        store.Save();
+        var preview = new CourseImportPreview();
+        preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Invalid, null, "无效记录", "缺少时间"));
+
+        new CourseScheduleImporter(store).Apply(preview, replaceCurrentSemester: true);
+
+        Assert(store.Data.Courses.Count == 1 && store.Data.Courses[0].Id == existing.Id,
+            "an empty replacement must not erase courses in memory");
+        Assert(new ProductivityStore(directory).Data.Courses.Single().Id == existing.Id,
+            "an empty replacement must not erase courses on disk");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("replace import retains duplicate rows and removes only omitted courses", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var existing = new CourseItem
+        {
+            Name = "原有且重复的课",
+            DayOfWeek = DayOfWeek.Monday,
+            StartTime = new TimeOnly(8, 0),
+            EndTime = new TimeOnly(9, 40)
+        };
+        store.Data.Courses.Add(existing);
+        var omitted = new CourseItem { Name = "文件未包含的课" };
+        store.Data.Courses.Add(omitted);
+        store.Data.PendingAlerts.Add(new PendingAlert
+        {
+            Source = AlertSource.Course,
+            SourceId = omitted.Id,
+            Message = "已移除课程的旧提醒"
+        });
+        store.Save();
+
+        var preview = new CourseImportPreview();
+        preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Duplicate, new CourseItem
+        {
+            Id = existing.Id,
+            Name = existing.Name,
+            DayOfWeek = existing.DayOfWeek,
+            StartTime = existing.StartTime,
+            EndTime = existing.EndTime
+        }, existing.Name));
+        preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Add, new CourseItem
+        {
+            Name = "新课程",
+            DayOfWeek = DayOfWeek.Tuesday,
+            StartTime = new TimeOnly(10, 0),
+            EndTime = new TimeOnly(11, 40)
+        }, "新课程"));
+
+        var importer = new CourseScheduleImporter(store);
+        importer.Apply(preview, replaceCurrentSemester: true);
+        Assert(store.Data.Courses.Count == 2
+            && store.Data.Courses.Any(course => course.Id == existing.Id)
+            && store.Data.Courses.Any(course => course.Name == "新课程")
+            && store.Data.Courses.All(course => course.Name != "文件未包含的课"),
+            "replacement should retain duplicate import rows and drop only omitted courses");
+        Assert(store.Data.PendingAlerts.All(alert => alert.SourceId != omitted.Id),
+            "replacement should remove pending alerts for omitted courses");
+
+        var duplicatesOnly = new CourseImportPreview();
+        duplicatesOnly.Rows.Add(preview.Rows[0]);
+        importer.Apply(duplicatesOnly, replaceCurrentSemester: true);
+        Assert(store.Data.Courses.Count == 1 && store.Data.Courses[0].Id == existing.Id,
+            "a duplicate-only file should still be a valid replacement");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("course import merge preserves local skipped dates and alert history", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new ProductivityStore(directory);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var existing = new CourseItem
+        {
+            Name = "待更新课程",
+            DayOfWeek = DayOfWeek.Monday,
+            StartTime = new TimeOnly(8, 0),
+            EndTime = new TimeOnly(9, 40),
+            Teacher = "旧老师",
+            ExcludedDates = [today],
+            LastAlertedDate = today
+        };
+        store.Data.Courses.Add(existing);
+        var preview = new CourseImportPreview();
+        preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Update, new CourseItem
+        {
+            Id = existing.Id,
+            Name = existing.Name,
+            DayOfWeek = existing.DayOfWeek,
+            StartTime = existing.StartTime,
+            EndTime = existing.EndTime,
+            Teacher = "新老师"
+        }, existing.Name));
+
+        new CourseScheduleImporter(store).Apply(preview, replaceCurrentSemester: false);
+
+        var updated = new ProductivityStore(directory).Data.Courses.Single();
+        Assert(updated.Teacher == "新老师" && updated.ExcludedDates.Contains(today)
+            && updated.LastAlertedDate == today,
+            "merge should apply imported fields without erasing local skip dates or alert history");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("ICS recurrence and exclusion dates become local course dates", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        Directory.CreateDirectory(directory);
+        var ics = Path.Combine(directory, "courses.ics");
+        File.WriteAllText(ics, "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//DragonDeskPet Test//CN\r\nBEGIN:VEVENT\r\nUID:math-test\r\nDTSTART:20260907T080000\r\nDTEND:20260907T094000\r\nRRULE:FREQ=WEEKLY;COUNT=3\r\nEXDATE:20260914T080000\r\nSUMMARY:高等数学\r\nLOCATION:A101\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n", new UTF8Encoding(false));
+        var store = new ProductivityStore(directory);
+        store.Data.Semester.StartDate = new DateOnly(2026, 9, 7);
+        var importer = new CourseScheduleImporter(store);
+        var preview = importer.Preview(ics, store.Data.Courses, store.Data.Semester);
+        Assert(preview.AddedCount == 1, "recurring ICS event should preview as a course");
+        var course = preview.Rows.Single(row => row.Course is not null).Course!;
+        Assert(course.IncludedDates.SetEquals([new DateOnly(2026, 9, 7), new DateOnly(2026, 9, 21)]), "EXDATE should remove the excluded recurrence");
+        Assert(course.StartTime == new TimeOnly(8, 0), "floating ICS time should remain local");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
+    }
+
+    return Task.CompletedTask;
+});
+
+await RunAsync("corrupt productivity data is backed up before clean recovery", () =>
+{
+    var directory = Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N"));
+    try
+    {
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "productivity.json");
+        File.WriteAllText(path, "{not-json");
+        var store = new ProductivityStore(directory);
+        Assert(store.Data.Reminders.Count == 0, "corrupt data should recover to a blank store");
+        Assert(!string.IsNullOrWhiteSpace(store.RecoveryNotice), "corrupt recovery should provide a user-facing notice");
+        Assert(Directory.GetFiles(directory, "*.corrupt").Length == 1, "corrupt original should be retained as a timestamped backup");
+    }
+    finally
+    {
+        if (Directory.Exists(directory)) Directory.Delete(directory, true);
     }
 
     return Task.CompletedTask;

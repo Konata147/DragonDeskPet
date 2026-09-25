@@ -1,0 +1,247 @@
+<Window x:Class="DragonDeskPet.CourseManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:DragonDeskPet"
+        Title="管理课表" Width="690" Height="700" MinWidth="620" MinHeight="550"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False"
+        Background="#F5F1FA" FontFamily="Microsoft YaHei UI">
+    <Window.Resources>
+        <local:CourseDayDisplayConverter x:Key="CourseDayDisplay" />
+        <Style x:Key="CourseButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" /><Setter Property="Padding" Value="12,7" /><Setter Property="Margin" Value="3" />
+            <Setter Property="Background" Value="#ECE6F7" /><Setter Property="Foreground" Value="#55456B" /><Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#DFD4F2" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#D2C3EC" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CoursePrimaryButton" TargetType="Button" BasedOn="{StaticResource CourseButton}">
+            <Setter Property="Background" Value="#8466D3" /><Setter Property="Foreground" Value="White" /><Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#7558C4" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#674AAD" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="36" /><Setter Property="Padding" Value="9,6" />
+            <Setter Property="Background" Value="#FDFBFF" /><Setter Property="Foreground" Value="#403653" />
+            <Setter Property="BorderBrush" Value="#D7CCEA" /><Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="10">
+                    <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                </Border>
+                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#9275DC" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseCombo" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="36" /><Setter Property="Foreground" Value="#403653" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBox">
+                <Grid>
+                    <ToggleButton x:Name="DropDownToggle" Focusable="False" ClickMode="Press"
+                                  IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                        <ToggleButton.Template><ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="Surface" Background="#FDFBFF" BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="10">
+                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                                    <ContentPresenter Margin="10,0,3,0" VerticalAlignment="Center"
+                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                      ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                    <Border Grid.Column="1" Margin="4" Background="#EEE8FA" CornerRadius="8">
+                                        <Path Width="9" Height="5" Stretch="Fill" Fill="#7258AE" Data="M 0 0 L 4.5 5 L 9 0 Z" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#B7A4DF" /></Trigger>
+                                <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#9275DC" /></Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate></ToggleButton.Template>
+                    </ToggleButton>
+                    <Popup x:Name="PART_Popup" PlacementTarget="{Binding ElementName=DropDownToggle}" Placement="Bottom" AllowsTransparency="True"
+                           StaysOpen="False" IsOpen="{TemplateBinding IsDropDownOpen}" PopupAnimation="Fade">
+                        <Border Width="{Binding ActualWidth, ElementName=DropDownToggle}" Margin="0,5,0,0" Padding="5" Background="#FFFCFF"
+                                BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="12">
+                            <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.2" Color="#4A3C62" /></Border.Effect>
+                            <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto"><ItemsPresenter /></ScrollViewer>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseComboItem" TargetType="ComboBoxItem">
+            <Setter Property="MinHeight" Value="32" /><Setter Property="Padding" Value="10,0" /><Setter Property="Foreground" Value="#403653" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ComboBoxItem">
+                <Border x:Name="Surface" Background="Transparent" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter ContentSource="Content" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Surface" Property="Background" Value="#EEE7FA" /></Trigger>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#E3D8F7" /><Setter Property="Foreground" Value="#6749B0" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseDateText" TargetType="DatePickerTextBox">
+            <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Foreground" Value="#403653" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DatePickerTextBox"><ScrollViewer x:Name="PART_ContentHost" Margin="10,5" /></ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseCalendarDay" TargetType="CalendarDayButton">
+            <Setter Property="Width" Value="31" /><Setter Property="Height" Value="28" /><Setter Property="Margin" Value="1" />
+            <Setter Property="Foreground" Value="#4A4058" /><Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CalendarDayButton">
+                <Border x:Name="DaySurface" Background="{TemplateBinding Background}" CornerRadius="8">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="DaySurface" Property="Background" Value="#EEE7FA" /></Trigger>
+                    <Trigger Property="IsToday" Value="True"><Setter Property="FontWeight" Value="Bold" /><Setter Property="Foreground" Value="#7255C1" /></Trigger>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="DaySurface" Property="Background" Value="#8466D3" /><Setter Property="Foreground" Value="White" /></Trigger>
+                    <Trigger Property="IsInactive" Value="True"><Setter Property="Opacity" Value="0.35" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseDate" TargetType="DatePicker">
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="DatePicker">
+                <Grid>
+                    <Border x:Name="Surface" Background="#FDFBFF" BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="10">
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                            <DatePickerTextBox x:Name="PART_TextBox" Style="{StaticResource CourseDateText}"
+                                               Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
+                            <Button x:Name="PART_Button" Grid.Column="1" Content="▾" Margin="3" Padding="0" Style="{StaticResource CourseButton}" Focusable="False" />
+                        </Grid>
+                    </Border>
+                    <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" StaysOpen="False"
+                           IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                        <Border Margin="0,5,0,0" Padding="8" Background="#FFFCFF" BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="14">
+                            <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.2" Color="#4A3C62" /></Border.Effect>
+                            <Calendar x:Name="PART_Calendar" BorderThickness="0" Background="#FFFCFF" CalendarDayButtonStyle="{StaticResource CourseCalendarDay}"
+                                      SelectedDate="{Binding SelectedDate, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                      DisplayDate="{Binding DisplayDate, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
+                        </Border>
+                    </Popup>
+                </Grid>
+                <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#9275DC" /></Trigger></ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="CourseLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#81758E" /><Setter Property="VerticalAlignment" Value="Center" /><Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Padding" Value="2" /><Setter Property="Margin" Value="1" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="Surface" Background="Transparent" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#EEE7FA" /></Trigger>
+                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="Surface" Property="Background" Value="#E3D8F7" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="182" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="2,0,2,12">
+            <TextBlock Text="管理课表" FontSize="20" FontWeight="SemiBold" Foreground="#403653" />
+            <TextBlock Text="课程信息只保存在本机，不会上传给 AI" FontSize="11" Foreground="#81758E" Margin="0,3,0,11" />
+            <Border Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14" Padding="11,9">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="学期开始" Style="{StaticResource CourseLabel}" />
+                    <DatePicker x:Name="SemesterStartPicker" Grid.Column="1" Style="{StaticResource CourseDate}" SelectedDateChanged="SemesterStartPicker_Changed" />
+                    <TextBlock Grid.Column="2" Text="用于计算教学周" Style="{StaticResource CourseLabel}" Margin="10,0,0,0" />
+                    <Button Grid.Column="3" Content="导入 ICS / CSV" Style="{StaticResource CourseButton}" Click="Import_Click" />
+                </Grid>
+            </Border>
+        </StackPanel>
+        <Border Grid.Row="1" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ListBox x:Name="CourseList" Margin="10" Padding="4" BorderThickness="0" Background="#FAF8FE" SelectionChanged="CourseList_SelectionChanged">
+                <ListBox.Resources>
+                    <Style TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}" />
+                </ListBox.Resources>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="6,4">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#403653" />
+                            <TextBlock FontSize="11" Foreground="#776A86">
+                                <Run Text="{Binding DayOfWeek, Converter={StaticResource CourseDayDisplay}}" /><Run Text="  " />
+                                <Run Text="{Binding StartTime}" /><Run Text="–" /><Run Text="{Binding EndTime}" />
+                                <Run Text="  " /><Run Text="{Binding Location}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel Grid.Column="1" Margin="0,10,9,0">
+                <Button Content="新建" Width="92" Style="{StaticResource CoursePrimaryButton}" Click="New_Click" />
+                <Button Content="今天停课" Width="92" Style="{StaticResource CourseButton}" Click="SkipToday_Click" />
+                <Button Content="删除" Width="92" Style="{StaticResource CourseButton}" Click="Delete_Click" />
+            </StackPanel>
+        </Grid>
+        </Border>
+        <Border Grid.Row="2" Margin="0,12,0,0" Padding="14" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer.Resources>
+                <Style TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}" />
+            </ScrollViewer.Resources>
+            <Grid Margin="0,0,4,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="76" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="76" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="课程信息" Grid.ColumnSpan="4" FontSize="13" FontWeight="SemiBold" Foreground="#403653" Margin="0,0,0,7" />
+                <TextBlock Grid.Row="1" Text="课程名" Style="{StaticResource CourseLabel}" /><TextBox x:Name="NameBox" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" Margin="3,3,0,5" />
+                <TextBlock Grid.Row="2" Text="星期" Style="{StaticResource CourseLabel}" />
+                <ComboBox x:Name="WeekdayBox" Grid.Row="2" Grid.Column="1" Margin="3,3,10,5" SelectedIndex="0" Style="{StaticResource CourseCombo}">
+                    <ComboBoxItem Content="星期一" Tag="Monday" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="星期二" Tag="Tuesday" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="星期三" Tag="Wednesday" Style="{StaticResource CourseComboItem}"/>
+                    <ComboBoxItem Content="星期四" Tag="Thursday" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="星期五" Tag="Friday" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="星期六" Tag="Saturday" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="星期日" Tag="Sunday" Style="{StaticResource CourseComboItem}"/>
+                </ComboBox>
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="上课时间" Style="{StaticResource CourseLabel}" />
+                <StackPanel Grid.Row="2" Grid.Column="3" Orientation="Horizontal"><TextBox x:Name="StartBox" Width="70" Text="08:00" Margin="3,3,0,5" TextAlignment="Center" ToolTip="HH:mm"/><TextBlock Text="–" VerticalAlignment="Center" Margin="5,0" Foreground="#81758E"/><TextBox x:Name="EndBox" Width="70" Text="09:40" Margin="0,3,0,5" TextAlignment="Center" ToolTip="HH:mm"/></StackPanel>
+                <TextBlock Grid.Row="3" Text="地点" Style="{StaticResource CourseLabel}" /><TextBox x:Name="LocationBox" Grid.Row="3" Grid.Column="1" Margin="3,3,10,5" />
+                <TextBlock Grid.Row="3" Grid.Column="2" Text="教师" Style="{StaticResource CourseLabel}" /><TextBox x:Name="TeacherBox" Grid.Row="3" Grid.Column="3" Margin="3,3,0,5" />
+                <TextBlock Grid.Row="4" Text="教学周" Style="{StaticResource CourseLabel}" />
+                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal"><TextBox x:Name="StartWeekBox" Width="55" Text="1" Margin="3,3,0,5" TextAlignment="Center"/><TextBlock Text="至" VerticalAlignment="Center" Margin="8,0" Foreground="#81758E"/><TextBox x:Name="EndWeekBox" Width="55" Text="16" Margin="0,3,0,5" TextAlignment="Center"/></StackPanel>
+                <TextBlock Grid.Row="4" Grid.Column="2" Text="周次规则" Style="{StaticResource CourseLabel}" />
+                <ComboBox x:Name="PatternBox" Grid.Row="4" Grid.Column="3" Margin="3,3,0,5" SelectedIndex="0" Style="{StaticResource CourseCombo}"><ComboBoxItem Content="全部周" Tag="All" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="单周" Tag="Odd" Style="{StaticResource CourseComboItem}"/><ComboBoxItem Content="双周" Tag="Even" Style="{StaticResource CourseComboItem}"/></ComboBox>
+                <TextBlock Grid.Row="5" Text="提前提醒" Style="{StaticResource CourseLabel}" />
+                <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal"><TextBox x:Name="ReminderMinutesBox" Width="60" Text="30" Margin="3,3,0,5" TextAlignment="Center"/><TextBlock Text="分钟" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#81758E"/></StackPanel>
+                <CheckBox x:Name="ReminderEnabledBox" Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" Content="启用课程提醒" IsChecked="True" VerticalAlignment="Center" Foreground="#403653" />
+                <CheckBox x:Name="CourseEnabledBox" Grid.Row="6" Grid.ColumnSpan="2" Content="启用这门课程" IsChecked="True" Margin="3,8,0,0" Foreground="#403653" />
+                <TextBlock x:Name="ValidationText" Grid.Row="7" Grid.ColumnSpan="4" Foreground="#B34B69" TextWrapping="Wrap" Margin="3,7,3,0" />
+            </Grid>
+            </ScrollViewer>
+        </Border>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="保存课程" Style="{StaticResource CoursePrimaryButton}" Click="SaveCourse_Click" />
+            <Button Content="关闭" Style="{StaticResource CourseButton}" Click="Close_Click" />
+        </StackPanel>
+    </Grid>
+</Window>

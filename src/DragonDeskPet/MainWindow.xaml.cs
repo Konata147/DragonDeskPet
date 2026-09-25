@@ -1,12 +1,15 @@
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Media;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Interop;
 using DragonDeskPet.AI;
 using DragonDeskPet.Core;
 using DragonDeskPet.Services;
@@ -16,6 +19,7 @@ using Point = System.Windows.Point;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
+using Button = System.Windows.Controls.Button;
 
 namespace DragonDeskPet;
 
@@ -23,28 +27,43 @@ public partial class MainWindow : Window
 {
     private const double LogicalSurfaceWidth = 430;
     private const double LogicalSurfaceHeight = 310;
-    private const double SurfaceLeftPadding = 150;
-    private const double SurfaceTopPadding = 150;
+    private const double SurfaceLeftPadding = 270;
+    private const double SurfaceTopPadding = 230;
     private const double SurfaceRightPadding = 130;
     private const double SurfaceBottomPadding = 50;
     private const double CharacterHalfWidth = 84;
     private const double CharacterScaleOriginY = 187;
+    private const double MinimumVisibleCharacterFraction = 0.5;
+    private static readonly nint HwndTopmost = new(-1);
+    private static readonly nint HwndNotTopmost = new(-2);
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
     private readonly App _app;
     private readonly PetStateMachine _stateMachine = new();
     private readonly Dictionary<PetState, BitmapSource> _stateImages = new();
+    private Rect _artworkBounds = new(0, 0, 1, 1);
     private readonly IFullscreenDetectionService _fullscreenDetectionService = new FullscreenDetectionService();
     private readonly DispatcherTimer _inactivityTimer;
     private readonly DispatcherTimer _positionSaveTimer;
+    private readonly DispatcherTimer _dragTimer;
     private readonly DispatcherTimer _fullscreenTimer;
+    private readonly DispatcherTimer _productivityTimer;
     private readonly Queue<DateTimeOffset> _recentClicks = new();
     private DateTimeOffset _lastInteraction = DateTimeOffset.Now;
     private Point _mouseDownPoint;
+    private NativePoint _dragStartCursor;
+    private NativeRect _dragStartWindow;
     private bool _mouseDown;
     private bool _dragged;
     private int _mouseDownClickCount;
     private bool _loaded;
     private bool _isBusy;
     private bool _hiddenForFullscreen;
+    private bool _hiddenByUser;
+    private bool _isFullscreenActive;
+    private Guid? _visibleAlertId;
     private CapturedScreenshot? _pendingScreenshot;
 
     public bool AllowClose { get; set; }
@@ -94,25 +113,54 @@ public partial class MainWindow : Window
             _positionSaveTimer.Stop();
             SavePosition();
         };
+        _dragTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _dragTimer.Tick += DragTimer_Tick;
         _fullscreenTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _fullscreenTimer.Tick += FullscreenTimer_Tick;
+        _productivityTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _productivityTimer.Tick += ProductivityTimer_Tick;
+        ProductivityPanel.CloseRequested += (_, _) => ProductivityPanel.Visibility = Visibility.Collapsed;
+        ProductivityPanel.CourseManagementRequested += (_, _) => OpenCourseManager();
 
         Loaded += MainWindow_Loaded;
+        ContentRendered += MainWindow_ContentRendered;
         _inactivityTimer.Start();
         _fullscreenTimer.Start();
+        _productivityTimer.Start();
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Topmost = _app.Settings.AlwaysOnTop;
+        ApplyNativeTopmost(Topmost);
         UpdateTopmostIndicators();
         ApplyScale(_app.Settings.Scale, save: false);
         LoadCharacterAssets();
         RestorePosition();
+        ProductivityPanel.Initialize(
+            _app.ProductivityStore,
+            _app.ReminderService,
+            _app.TodoService,
+            _app.CourseScheduleService,
+            _app.PomodoroService);
         _loaded = true;
         if (!_app.Settings.HasCompletedOnboarding)
         {
             OnboardingBubble.Visibility = Visibility.Visible;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_app.ProductivityStore.RecoveryNotice))
+        {
+            OnboardingBubble.Visibility = Visibility.Collapsed;
+            ShowChatMessage(_app.ProductivityStore.RecoveryNotice);
+        }
+    }
+
+    private void MainWindow_ContentRendered(object? sender, EventArgs e)
+    {
+        if (EnsurePetOnVisibleScreen())
+        {
+            SavePosition();
         }
     }
 
@@ -133,6 +181,25 @@ public partial class MainWindow : Window
                 {
                     _stateImages[state] = AssetService.LoadCharacterAsset(state, LoadBitmap);
                 }
+            }
+
+            try
+            {
+                var union = Rect.Empty;
+                foreach (var image in _stateImages.Values.Distinct())
+                {
+                    union.Union(CharacterArtworkBounds.FindOpaqueNormalizedBounds(image));
+                }
+
+                if (!union.IsEmpty)
+                {
+                    _artworkBounds = union;
+                }
+            }
+            catch
+            {
+                // Keep the full image bounds if a particular decoder cannot expose pixels.
+                _artworkBounds = new Rect(0, 0, 1, 1);
             }
 
             CharacterImage.Source = idle;
@@ -188,12 +255,33 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseEnter(object sender, MouseEventArgs e)
     {
-        MarkInteraction();
-        if (_stateMachine.Current is PetState.Idle or PetState.Sleeping)
+        UpdateHoverFromPointer(e.GetPosition(CharacterImage));
+    }
+
+    private void UpdateHoverFromPointer(Point point)
+    {
+        if (_mouseDown || _dragged)
         {
-            _stateMachine.TransitionTo(PetState.Hover);
+            return;
+        }
+
+        if (IsCharacterPixelHit(point))
+        {
+            MarkInteraction();
+            if (_stateMachine.Current is PetState.Idle or PetState.Sleeping)
+            {
+                _stateMachine.TransitionTo(PetState.Hover);
+            }
+        }
+        else if (_stateMachine.Current == PetState.Hover)
+        {
+            _stateMachine.TransitionTo(PetState.Idle);
         }
     }
+
+    private bool IsPointerOverCharacter() =>
+        IsVisible && CharacterHost.IsMouseOver
+        && IsCharacterPixelHit(Mouse.GetPosition(CharacterImage));
 
     private async void CharacterHost_MouseLeave(object sender, MouseEventArgs e)
     {
@@ -233,19 +321,83 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (!IsCharacterPixelHit(e.GetPosition(CharacterImage)))
+        {
+            return;
+        }
+
         MarkInteraction();
+        if (!GetCursorPos(out _dragStartCursor)
+            || !GetWindowRect(new WindowInteropHelper(this).Handle, out _dragStartWindow))
+        {
+            return;
+        }
+
         _mouseDown = true;
         _dragged = false;
         _mouseDownPoint = e.GetPosition(this);
         _mouseDownClickCount = e.ClickCount;
-        CharacterHost.CaptureMouse();
+        if (!CharacterHost.CaptureMouse())
+        {
+            _mouseDown = false;
+            return;
+        }
+
         e.Handled = true;
+    }
+
+    private bool IsCharacterPixelHit(Point point)
+    {
+        if (CharacterImage.Visibility != Visibility.Visible || CharacterImage.Source is not BitmapSource bitmap)
+        {
+            return true;
+        }
+
+        var width = CharacterImage.ActualWidth;
+        var height = CharacterImage.ActualHeight;
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        var fit = Math.Min(width / bitmap.PixelWidth, height / bitmap.PixelHeight);
+        var x = (int)Math.Floor((point.X - ((width - bitmap.PixelWidth * fit) / 2)) / fit);
+        var y = (int)Math.Floor((point.Y - ((height - bitmap.PixelHeight * fit) / 2)) / fit);
+        if (x < 0 || x >= bitmap.PixelWidth || y < 0 || y >= bitmap.PixelHeight)
+        {
+            return false;
+        }
+
+        var pixels = bitmap.Format == System.Windows.Media.PixelFormats.Bgra32
+            || bitmap.Format == System.Windows.Media.PixelFormats.Pbgra32
+            ? bitmap
+            : new FormatConvertedBitmap(bitmap, System.Windows.Media.PixelFormats.Bgra32, null, 0);
+        var pixel = new byte[4];
+        pixels.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, 4, 0);
+        return pixel[3] >= 32;
     }
 
     private async void CharacterHost_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_mouseDown || e.LeftButton != MouseButtonState.Pressed || _dragged)
+        if (!_mouseDown)
         {
+            UpdateHoverFromPointer(e.GetPosition(CharacterImage));
+            return;
+        }
+
+        if (e.LeftButton != MouseButtonState.Pressed)
+        {
+            if (_dragged)
+            {
+                await CompleteDragAsync();
+            }
+
+            return;
+        }
+
+        if (_dragged)
+        {
+            MoveDragWindowToCursor();
             return;
         }
 
@@ -257,20 +409,106 @@ public partial class MainWindow : Window
         }
 
         _dragged = true;
-        CharacterHost.ReleaseMouseCapture();
         _stateMachine.TransitionTo(PetState.Dragged);
-        try
+        _dragTimer.Start();
+        MoveDragWindowToCursor();
+    }
+
+    private async void DragTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_dragged)
         {
-            DragMove();
+            _dragTimer.Stop();
+            return;
         }
-        catch (InvalidOperationException)
-        {
-            // The pointer may have been released between move messages.
-        }
-        finally
+
+        if ((GetAsyncKeyState(0x01) & 0x8000) == 0)
         {
             await CompleteDragAsync();
+            return;
         }
+
+        MoveDragWindowToCursor();
+    }
+
+    private void MoveDragWindowToCursor()
+    {
+        if (!_dragged || !GetCursorPos(out var cursor))
+        {
+            return;
+        }
+
+        var x = _dragStartWindow.Left + cursor.X - _dragStartCursor.X;
+        var y = _dragStartWindow.Top + cursor.Y - _dragStartCursor.Y;
+        if (TryGetCharacterOffset(out var characterOffset))
+        {
+            var screen = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point(cursor.X, cursor.Y));
+            var bounded = PetPlacement.ClampWindowTopLeft(
+                new System.Drawing.Point(x, y), characterOffset, screen.Bounds, 8,
+                MinimumVisibleCharacterFraction);
+            x = bounded.X;
+            y = bounded.Y;
+        }
+
+        _ = SetWindowPos(new WindowInteropHelper(this).Handle, nint.Zero, x, y, 0, 0,
+            SwpNoSize | SwpNoZOrder | SwpNoActivate);
+    }
+
+    private bool TryGetCharacterOffset(out System.Drawing.Rectangle characterOffset)
+    {
+        characterOffset = default;
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == nint.Zero || !CharacterHost.IsLoaded || !GetWindowRect(handle, out var windowRect))
+        {
+            return false;
+        }
+
+        var visualBounds = CharacterHost.TransformToAncestor(this)
+            .TransformBounds(new Rect(new Point(0, 0), CharacterHost.RenderSize));
+        if (CharacterImage.Visibility == Visibility.Visible
+            && CharacterImage.Source is BitmapSource image
+            && CharacterImage.RenderSize.Width > 0
+            && CharacterImage.RenderSize.Height > 0)
+        {
+            var artworkInImage = CharacterArtworkBounds.FitNormalizedBounds(
+                _artworkBounds, CharacterImage.RenderSize, new System.Windows.Size(image.PixelWidth, image.PixelHeight));
+            visualBounds = CharacterImage.TransformToAncestor(this).TransformBounds(artworkInImage);
+        }
+        var topLeft = PointToScreen(visualBounds.TopLeft);
+        var bottomRight = PointToScreen(visualBounds.BottomRight);
+        characterOffset = System.Drawing.Rectangle.FromLTRB(
+            (int)Math.Floor(topLeft.X - windowRect.Left),
+            (int)Math.Floor(topLeft.Y - windowRect.Top),
+            (int)Math.Ceiling(bottomRight.X - windowRect.Left),
+            (int)Math.Ceiling(bottomRight.Y - windowRect.Top));
+        return characterOffset.Width > 0 && characterOffset.Height > 0;
+    }
+
+    private bool EnsurePetOnVisibleScreen()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == nint.Zero || !GetWindowRect(handle, out var windowRect)
+            || !TryGetCharacterOffset(out var characterOffset))
+        {
+            return false;
+        }
+
+        var center = new System.Drawing.Point(
+            windowRect.Left + characterOffset.Left + characterOffset.Width / 2,
+            windowRect.Top + characterOffset.Top + characterOffset.Height / 2);
+        var screen = System.Windows.Forms.Screen.FromPoint(center);
+        var bounded = PetPlacement.ClampWindowTopLeft(
+            new System.Drawing.Point(windowRect.Left, windowRect.Top), characterOffset, screen.Bounds, 8,
+            MinimumVisibleCharacterFraction);
+        if (bounded.X == windowRect.Left && bounded.Y == windowRect.Top)
+        {
+            return false;
+        }
+
+        _ = SetWindowPos(handle, nint.Zero, bounded.X, bounded.Y, 0, 0,
+            SwpNoSize | SwpNoZOrder | SwpNoActivate);
+        SyncWindowPositionFromNative();
+        return true;
     }
 
     private async void CharacterHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -308,8 +546,14 @@ public partial class MainWindow : Window
     private async Task CompleteDragAsync()
     {
         var wasDragging = _dragged || _stateMachine.Current == PetState.Dragged;
+        if (wasDragging)
+        {
+            MoveDragWindowToCursor();
+        }
+
         _mouseDown = false;
         _dragged = false;
+        _dragTimer.Stop();
         if (Mouse.Captured == CharacterHost)
         {
             CharacterHost.ReleaseMouseCapture();
@@ -321,6 +565,7 @@ public partial class MainWindow : Window
         }
 
         MarkInteraction();
+        SyncWindowPositionFromNative();
         SavePosition();
         _stateMachine.TransitionTo(PetState.Happy);
         await ReturnToIdleAsync();
@@ -491,6 +736,8 @@ public partial class MainWindow : Window
         QuickBar.Margin = new Thickness(0, SurfaceTopPadding + quickBarTop, outerRightMargin, 0);
         ChatBubble.Margin = new Thickness(0, 18, outerRightMargin, SurfaceBottomPadding + 26);
         OnboardingBubble.Margin = new Thickness(0, 0, outerRightMargin, SurfaceBottomPadding + 26);
+        ProductivityPanel.Margin = new Thickness(0, 0, outerRightMargin, SurfaceBottomPadding + 26);
+        ReminderAlertCard.Margin = new Thickness(0, 0, outerRightMargin, SurfaceBottomPadding + 30);
 
         QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
         QuickBarScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
@@ -645,15 +892,17 @@ public partial class MainWindow : Window
 
     private async Task ReturnToIdleAsync(int delayMilliseconds = 900)
     {
+        var feedbackRevision = _stateMachine.Revision;
         await Task.Delay(delayMilliseconds);
-        if (_stateMachine.Current is PetState.Happy or PetState.Angry or PetState.Dragged)
+        if (!_mouseDown && !_dragged)
         {
-            _stateMachine.TransitionTo(PetState.Idle);
+            _stateMachine.TryFinishFeedback(feedbackRevision, IsPointerOverCharacter());
         }
     }
 
     private void ToggleChat()
     {
+        ProductivityPanel.Visibility = Visibility.Collapsed;
         ChatBubble.Visibility = ChatBubble.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
         HideQuickBar();
         if (ChatBubble.Visibility == Visibility.Visible)
@@ -663,6 +912,43 @@ public partial class MainWindow : Window
     }
 
     private void CloseChat_Click(object sender, RoutedEventArgs e) => ChatBubble.Visibility = Visibility.Collapsed;
+
+    public void OpenProductivity()
+    {
+        MarkInteraction();
+        _hiddenByUser = false;
+        if (!IsVisible)
+        {
+            var showActivated = ShowActivated;
+            try
+            {
+                ShowActivated = false;
+                Show();
+            }
+            finally
+            {
+                ShowActivated = showActivated;
+            }
+
+            ApplyNativeTopmost(Topmost);
+        }
+
+        ChatBubble.Visibility = Visibility.Collapsed;
+        ReminderAlertCard.Visibility = Visibility.Collapsed;
+        HideQuickBar();
+        ProductivityPanel.RefreshAll();
+        ProductivityPanel.Visibility = Visibility.Visible;
+    }
+
+    private void OpenCourseManager()
+    {
+        var window = new CourseManagerWindow(_app.ProductivityStore, _app.CourseScheduleService, _app.CourseScheduleImporter)
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+        ProductivityPanel.RefreshAll();
+    }
 
     private async void ScreenshotMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -939,6 +1225,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (ReminderCommandParser.LooksLikeReminderCommand(prompt))
+        {
+            if (ReminderCommandParser.TryParse(prompt, DateTimeOffset.Now, out var draft, out var error) && draft is not null)
+            {
+                PromptBox.Clear();
+                OpenProductivity();
+                ProductivityPanel.PrefillReminder(draft);
+            }
+            else
+            {
+                PromptBox.Clear();
+                OpenProductivity();
+                ProductivityPanel.ShowReminderError(error);
+            }
+
+            return;
+        }
+
         MarkInteraction();
         var pendingScreenshot = _pendingScreenshot;
         var request = new AiRequest(prompt, pendingScreenshot?.CreateAttachment());
@@ -983,6 +1287,7 @@ public partial class MainWindow : Window
         {
             _app.Settings = saved;
             Topmost = saved.AlwaysOnTop;
+            ApplyNativeTopmost(Topmost);
             UpdateTopmostIndicators();
             ApplyScale(saved.Scale, save: false);
             _app.SettingsService.Save(saved);
@@ -992,9 +1297,12 @@ public partial class MainWindow : Window
             Owner = this
         };
         window.ShowDialog();
+        ApplyNativeTopmost(Topmost);
     }
 
     private void ChatMenuItem_Click(object sender, RoutedEventArgs e) => ToggleChat();
+
+    private void ProductivityMenuItem_Click(object sender, RoutedEventArgs e) => OpenProductivity();
 
     private void SettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -1012,6 +1320,7 @@ public partial class MainWindow : Window
     private void TopmostMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Topmost = !Topmost;
+        ApplyNativeTopmost(Topmost);
         UpdateTopmostIndicators();
         _app.Settings.AlwaysOnTop = Topmost;
         _app.SettingsService.Save(_app.Settings);
@@ -1026,7 +1335,12 @@ public partial class MainWindow : Window
 
     private void PetMenu_Closed(object sender, RoutedEventArgs e)
     {
-        if (_stateMachine.Current == PetState.Hover)
+        ApplyNativeTopmost(Topmost);
+        if (IsPointerOverCharacter())
+        {
+            UpdateHoverFromPointer(Mouse.GetPosition(CharacterImage));
+        }
+        else if (_stateMachine.Current == PetState.Hover)
         {
             _stateMachine.TransitionTo(PetState.Idle);
         }
@@ -1048,7 +1362,123 @@ public partial class MainWindow : Window
         _app.SettingsService.Save(_app.Settings);
     }
 
+    private void SyncWindowPositionFromNative()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        var transform = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice;
+        if (handle == nint.Zero || transform is null || !GetWindowRect(handle, out var rect))
+        {
+            return;
+        }
+
+        var logicalPosition = transform.Value.Transform(new Point(rect.Left, rect.Top));
+        if (Math.Abs(Left - logicalPosition.X) > 0.25)
+        {
+            Left = logicalPosition.X;
+        }
+
+        if (Math.Abs(Top - logicalPosition.Y) > 0.25)
+        {
+            Top = logicalPosition.Y;
+        }
+    }
+
     private void Window_Deactivated(object? sender, EventArgs e) => HideQuickBar();
+
+    private void ProductivityTimer_Tick(object? sender, EventArgs e)
+    {
+        var nowUtc = DateTimeOffset.UtcNow;
+        _app.ReminderService.Tick(nowUtc);
+        _app.PomodoroService.Tick(nowUtc);
+        _app.CourseScheduleService.Tick(DateTimeOffset.Now);
+        if (ProductivityPanel.Visibility == Visibility.Visible)
+        {
+            ProductivityPanel.RefreshAll();
+        }
+
+        PresentNextPendingAlert(nowUtc);
+    }
+
+    private void PresentNextPendingAlert(DateTimeOffset nowUtc)
+    {
+        var alerts = _app.ReminderService.GetPendingAlerts(nowUtc);
+        if (alerts.Count == 0)
+        {
+            _visibleAlertId = null;
+            ReminderAlertCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var alert = alerts[0];
+        if (_isFullscreenActive)
+        {
+            ReminderAlertCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_hiddenByUser || !IsVisible)
+        {
+            ReminderAlertCard.Visibility = Visibility.Collapsed;
+            if (!alert.TrayNotificationShown)
+            {
+                _app.ShowLocalNotification(alert.Title, alert.Message);
+                alert.TrayNotificationShown = true;
+                _app.ProductivityStore.Save();
+            }
+
+            return;
+        }
+
+        if (_visibleAlertId == alert.Id)
+        {
+            return;
+        }
+
+        _visibleAlertId = alert.Id;
+        AlertTitleText.Text = alert.Title;
+        AlertMessageText.Text = alert.Message;
+        AlertRemainingText.Text = alerts.Count > 1 ? $"还有 {alerts.Count - 1} 条" : string.Empty;
+        ProductivityPanel.Visibility = Visibility.Collapsed;
+        ChatBubble.Visibility = Visibility.Collapsed;
+        ReminderAlertCard.Visibility = Visibility.Visible;
+        if (!alert.TrayNotificationShown)
+        {
+            if (_app.Settings.ReminderSoundEnabled)
+            {
+                SystemSounds.Asterisk.Play();
+            }
+
+            alert.TrayNotificationShown = true;
+            _app.ProductivityStore.Save();
+        }
+
+        _stateMachine.TransitionTo(PetState.Happy);
+        _ = ReturnToIdleAsync(1200);
+    }
+
+    private void CompleteAlert_Click(object sender, RoutedEventArgs e)
+    {
+        if (_visibleAlertId is { } id)
+        {
+            _app.ReminderService.Complete(id);
+            _visibleAlertId = null;
+            PresentNextPendingAlert(DateTimeOffset.UtcNow);
+        }
+    }
+
+    private void SnoozeAlert_Click(object sender, RoutedEventArgs e)
+    {
+        if (_visibleAlertId is not { } id
+            || sender is not Button { Tag: string minutesText }
+            || !int.TryParse(minutesText, out var minutes))
+        {
+            return;
+        }
+
+        _app.ReminderService.Snooze(id, TimeSpan.FromMinutes(minutes), DateTimeOffset.UtcNow);
+        _visibleAlertId = null;
+        PresentNextPendingAlert(DateTimeOffset.UtcNow);
+    }
 
     private void FullscreenTimer_Tick(object? sender, EventArgs e)
     {
@@ -1057,8 +1487,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var shouldHide = _app.Settings.AutoHideInFullscreen
-            && _fullscreenDetectionService.IsForegroundWindowFullscreen();
+        _isFullscreenActive = _fullscreenDetectionService.IsForegroundWindowFullscreen();
+        var shouldHide = _app.Settings.AutoHideInFullscreen && _isFullscreenActive;
 
         if (shouldHide)
         {
@@ -1078,30 +1508,50 @@ public partial class MainWindow : Window
         }
 
         _hiddenForFullscreen = false;
+        if (_hiddenByUser)
+        {
+            PresentNextPendingAlert(DateTimeOffset.UtcNow);
+            return;
+        }
+
         var showActivated = ShowActivated;
         try
         {
             ShowActivated = false;
             Show();
             WindowState = WindowState.Normal;
+            if (EnsurePetOnVisibleScreen())
+            {
+                SavePosition();
+            }
+            ApplyNativeTopmost(Topmost);
         }
         finally
         {
             ShowActivated = showActivated;
         }
+
+        PresentNextPendingAlert(DateTimeOffset.UtcNow);
     }
 
     public void ShowFromUserRequest()
     {
         _hiddenForFullscreen = false;
+        _hiddenByUser = false;
         Show();
         WindowState = WindowState.Normal;
+        if (EnsurePetOnVisibleScreen())
+        {
+            SavePosition();
+        }
+        ApplyNativeTopmost(Topmost);
         Activate();
     }
 
     public void HideFromUserRequest()
     {
         _hiddenForFullscreen = false;
+        _hiddenByUser = true;
         HideQuickBar();
         Hide();
     }
@@ -1111,7 +1561,9 @@ public partial class MainWindow : Window
         SavePosition();
         if (AllowClose)
         {
+            _dragTimer.Stop();
             _fullscreenTimer.Stop();
+            _productivityTimer.Stop();
             ClearPendingScreenshot();
             return;
         }
@@ -1119,4 +1571,60 @@ public partial class MainWindow : Window
         e.Cancel = true;
         HideFromUserRequest();
     }
+
+    private void ApplyNativeTopmost(bool enabled)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == nint.Zero)
+        {
+            return;
+        }
+
+        _ = SetWindowPos(
+            handle,
+            enabled ? HwndTopmost : HwndNotTopmost,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoActivate);
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        nint windowHandle,
+        nint insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out NativePoint point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(nint windowHandle, out NativeRect rect);
+
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int virtualKey);
 }

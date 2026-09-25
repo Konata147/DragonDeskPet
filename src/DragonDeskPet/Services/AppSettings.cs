@@ -9,6 +9,11 @@ public sealed class AppSettings
     public double Scale { get; set; } = 1.0;
     public bool AlwaysOnTop { get; set; } = true;
     public bool AutoHideInFullscreen { get; set; } = true;
+    public bool ReminderSoundEnabled { get; set; } = true;
+    public int PomodoroFocusMinutes { get; set; } = 25;
+    public int PomodoroShortBreakMinutes { get; set; } = 5;
+    public int PomodoroLongBreakMinutes { get; set; } = 15;
+    public int PomodoroRoundsBeforeLongBreak { get; set; } = 4;
     public bool StartWithWindows { get; set; }
     public bool HasCompletedOnboarding { get; set; }
     public string Provider { get; set; } = "Offline";

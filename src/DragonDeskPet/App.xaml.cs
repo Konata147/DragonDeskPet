@@ -24,6 +24,12 @@ public partial class App : Application
     public IScreenshotCaptureService ScreenshotCaptureService { get; } = new ScreenshotCaptureService();
     public IClipboardContentService ClipboardContentService { get; } = new ClipboardContentService();
     public IImageFileService ImageFileService { get; } = new ImageFileService();
+    public IProductivityStore ProductivityStore { get; private set; } = null!;
+    public ReminderService ReminderService { get; private set; } = null!;
+    public TodoService TodoService { get; private set; } = null!;
+    public CourseScheduleService CourseScheduleService { get; private set; } = null!;
+    public CourseScheduleImporter CourseScheduleImporter { get; private set; } = null!;
+    public PomodoroService PomodoroService { get; private set; } = null!;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -44,12 +50,19 @@ public partial class App : Application
         RegisterExceptionHandlers();
         _singleInstance.ShowRequested += (_, _) => Dispatcher.BeginInvoke(ShowPet);
         Settings = SettingsService.Load();
+        ProductivityStore = new ProductivityStore(SettingsService.SettingsDirectory);
+        ReminderService = new ReminderService(ProductivityStore);
+        TodoService = new TodoService(ProductivityStore);
+        CourseScheduleService = new CourseScheduleService(ProductivityStore);
+        CourseScheduleImporter = new CourseScheduleImporter(ProductivityStore);
+        PomodoroService = new PomodoroService(ProductivityStore, () => Settings);
 
         var mainWindow = new MainWindow(this);
         MainWindow = mainWindow;
         _trayIcon = new TrayIconService(
             show: () => Dispatcher.Invoke(ShowPet),
             hide: () => Dispatcher.Invoke(mainWindow.HideFromUserRequest),
+            openProductivity: () => Dispatcher.Invoke(mainWindow.OpenProductivity),
             openSettings: () => Dispatcher.Invoke(mainWindow.OpenSettings),
             exit: () => Dispatcher.Invoke(ExitApplication),
             iconPath: AssetService.IconPath);
@@ -69,6 +82,8 @@ public partial class App : Application
             window.ShowFromUserRequest();
         }
     }
+
+    public void ShowLocalNotification(string title, string message) => _trayIcon?.ShowNotification(title, message);
 
     public void ExitApplication()
     {

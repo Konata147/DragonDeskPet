@@ -40,3 +40,19 @@
 - Drag multiple files or an unsupported file: the drop is rejected with a clear supported-format message.
 - Image failure retry: a failed provider request retains clipboard or dropped-image preview and prompt; success or manual removal clears it.
 - Inspect `data/logs` after a controlled diagnostic test: no more than ten `crash-*.txt` files remain and configured secrets are absent.
+
+## V0.3 campus productivity acceptance
+
+- Open the compact productivity bubble from the quick bar, pet context menu, and tray. Switch among 今日、提醒、专注 without clipping the pet or changing the normal chat experience.
+- Create, edit, disable, re-enable, complete, snooze for 5/10/30 minutes, and delete a one-time or daily reminder. Verify the alert sounds once when sound is enabled and stays silent when disabled.
+- Enter `20分钟后提醒我休息`, `明天 8:30 提醒我上课`, and `每天 22:00 提醒我吃药` in local chat. Confirm each parsed time before saving; ambiguous input must ask for the form and must not be sent to an AI provider.
+- Let a reminder become due while the app is closed, then restart. Let another become due during computer sleep, then wake. Both should appear as pending alerts rather than disappear.
+- With a fullscreen app in front, let a reminder become due. The pet and sound remain quiet; leaving fullscreen presents the queued alert without stealing focus.
+- Manually hide the pet when a reminder is due. Exactly one tray notification appears and the alert remains queued until the pet is shown. If fullscreen and manual hide overlap, the tray notification waits until fullscreen ends.
+- Create a todo, edit its text, complete it, restore it, and delete it. Across midnight, unfinished todos carry forward; completed todos remain archived for seven days and are then cleaned.
+- Set a custom focus duration and start a pomodoro. Pause, resume, and cancel; then complete a full cycle through four focus rounds, short breaks, and a long break. Each phase waits for confirmation before the next starts. Restart mid-phase and check the remaining time.
+- Set a semester start date and add courses with time, location, teacher, week range, and all/odd/even week rules. Check the teaching-week label, today's sorted course cards, per-course advance reminder, and a single-day 今天停课 exclusion.
+- From a course card, create a related todo. Editing or deleting a course uses the styled confirmation UI and leaves the original course unchanged when cancelled.
+- Import `docs/course-template.csv` and `docs/course-template.ics`. Preview counts and full details before confirming. Cancel must write nothing; merge must preserve local skipped dates and alert history; replace must include duplicate rows and must not erase the schedule when every imported row is invalid.
+- Inspect the three-page bubble and course management/import windows at 60% and 200% pet scale. Text, date/time controls, menus, buttons, and scrollbars remain readable and reachable without covering or clipping the character.
+- Restart the portable D-drive build and confirm course, reminder, todo, pomodoro, position, and settings persistence. Confirm `data/productivity.json` stays local and that no course or reminder contents appear in crash logs or AI requests.

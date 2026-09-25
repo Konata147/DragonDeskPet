@@ -1,0 +1,432 @@
+<UserControl x:Class="DragonDeskPet.ProductivityBubble"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="348" Height="448"
+             FontFamily="Microsoft YaHei UI">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="PanelText" Color="#403653" />
+        <SolidColorBrush x:Key="PanelMuted" Color="#81768D" />
+        <Style x:Key="SoftButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="Background" Value="#EEE8FA" />
+            <Setter Property="Foreground" Value="#56456F" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#E3D8F7" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#D5C5F1" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="Background" Value="#8466D3" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#7558C4" /></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#674AAD" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="MiniButton" TargetType="Button" BasedOn="{StaticResource SoftButton}">
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+        <Style x:Key="PanelTextBox" TargetType="TextBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Padding" Value="9,6" />
+            <Setter Property="BorderBrush" Value="#D7CCEA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="#FEFDFF" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="TextSurface"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="TextSurface" Property="BorderBrush" Value="#9275DC" />
+                                <Setter TargetName="TextSurface" Property="Background" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DateTextBoxStyle" TargetType="DatePickerTextBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="Padding" Value="9,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DatePickerTextBox">
+                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CalendarDayStyle" TargetType="CalendarDayButton">
+            <Setter Property="Width" Value="31" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="Foreground" Value="#4A4058" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CalendarDayButton">
+                        <Border x:Name="DaySurface" Background="{TemplateBinding Background}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="DaySurface" Property="Background" Value="#EEE7FA" /></Trigger>
+                            <Trigger Property="IsToday" Value="True"><Setter Property="FontWeight" Value="Bold" /><Setter Property="Foreground" Value="#7255C1" /></Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="DaySurface" Property="Background" Value="#8466D3" />
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                            <Trigger Property="IsInactive" Value="True"><Setter Property="Opacity" Value="0.35" /></Trigger>
+                            <Trigger Property="IsBlackedOut" Value="True"><Setter Property="Opacity" Value="0.25" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrettyDatePicker" TargetType="DatePicker">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Background" Value="#FEFDFF" />
+            <Setter Property="BorderBrush" Value="#D7CCEA" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DatePicker">
+                        <Grid>
+                            <Border x:Name="DateSurface"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+                                    <DatePickerTextBox x:Name="PART_TextBox"
+                                                       Grid.Column="0"
+                                                       Style="{StaticResource DateTextBoxStyle}"
+                                                       Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" />
+                                    <Button x:Name="PART_Button"
+                                            Grid.Column="1"
+                                            Width="27" Height="27"
+                                            Margin="1"
+                                            Padding="0"
+                                            Background="#EEE8FA"
+                                            Foreground="#765DB2"
+                                            BorderThickness="0"
+                                            Focusable="False"
+                                            Content="▾"
+                                            Style="{StaticResource SoftButton}" />
+                                </Grid>
+                            </Border>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <Border Margin="0,5,0,0" Padding="8" Background="#FFFCFF" BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="14">
+                                    <Border.Effect><DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.2" Color="#4A3C62" /></Border.Effect>
+                                    <Calendar x:Name="PART_Calendar"
+                                              BorderThickness="0"
+                                              Background="#FFFCFF"
+                                              CalendarDayButtonStyle="{StaticResource CalendarDayStyle}"
+                                              SelectedDate="{Binding SelectedDate, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              DisplayDate="{Binding DisplayDate, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              DisplayDateStart="{Binding DisplayDateStart, RelativeSource={RelativeSource TemplatedParent}}"
+                                              DisplayDateEnd="{Binding DisplayDateEnd, RelativeSource={RelativeSource TemplatedParent}}" />
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="DateSurface" Property="BorderBrush" Value="#9275DC" /></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrettyRepeatBox" TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="Background" Value="#FEFDFF" />
+            <Setter Property="BorderBrush" Value="#D7CCEA" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="RepeatSurface" Background="#FEFDFF" BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="10">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="19"/></Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"
+                                                                  Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
+                                                <Path Grid.Column="1" Width="7" Height="4" Stretch="Fill" Fill="#765DB2"
+                                                      Data="M 0 0 L 3.5 4 L 7 0 Z" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="RepeatSurface" Property="BorderBrush" Value="#B7A4DF" /></Trigger>
+                                            <Trigger Property="IsChecked" Value="True"><Setter TargetName="RepeatSurface" Property="BorderBrush" Value="#9275DC" /></Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   PlacementTarget="{Binding ElementName=DropDownToggle}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   StaysOpen="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   PopupAnimation="Fade">
+                                <Border Width="{Binding ActualWidth, ElementName=DropDownToggle}"
+                                        Margin="0,4,0,0" Padding="4" Background="#FFFCFF"
+                                        BorderBrush="#D7CCEA" BorderThickness="1" CornerRadius="10">
+                                    <Border.Effect><DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.18" Color="#4A3C62" /></Border.Effect>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrettyRepeatItem" TargetType="ComboBoxItem">
+            <Setter Property="MinHeight" Value="29" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="RepeatItemSurface" Background="Transparent" CornerRadius="7">
+                            <ContentPresenter ContentSource="Content" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="RepeatItemSurface" Property="Background" Value="#EEE7FA" /></Trigger>
+                            <Trigger Property="IsSelected" Value="True"><Setter TargetName="RepeatItemSurface" Property="Background" Value="#E3D8F7" /><Setter Property="Foreground" Value="#6749B0" /><Setter Property="FontWeight" Value="SemiBold" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource PanelText}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#766986" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="20,8" />
+            <Setter Property="Margin" Value="2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="TabSurface" Background="Transparent" CornerRadius="11" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="TabSurface" Property="Background" Value="#FFFFFF" />
+                                <Setter Property="Foreground" Value="#6B4FBC" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="TabSurface" Property="Background" Value="#F8F5FD" /></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TabControl">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                            <Border Background="#EEE9F7" CornerRadius="13" Padding="2" HorizontalAlignment="Center">
+                                <TabPanel IsItemsHost="True" Background="Transparent" />
+                            </Border>
+                            <ContentPresenter Grid.Row="1" ContentSource="SelectedContent" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Background="#FCFAFF" BorderBrush="#D8CCEC" BorderThickness="1" CornerRadius="24">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.22" Color="#4A3C62" />
+        </Border.Effect>
+        <Grid ClipToBounds="True">
+            <Grid.RowDefinitions><RowDefinition Height="60"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Border CornerRadius="24,24,0,0">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#F0EAFE" Offset="0"/><GradientStop Color="#FBF8FF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid Margin="15,0,11,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/><ColumnDefinition Width="34"/></Grid.ColumnDefinitions>
+                    <Border Width="34" Height="34" CornerRadius="17" Background="#8466D3" VerticalAlignment="Center">
+                        <TextBlock Text="✦" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="3,0,0,0">
+                        <TextBlock Text="校园效率助手" FontSize="15" FontWeight="SemiBold" Foreground="#3F3452" />
+                        <TextBlock Text="把今天安排得轻松一点" FontSize="10.5" Foreground="#897C98" Margin="0,2,0,0" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Content="×" Width="28" Height="28" Padding="0" Style="{StaticResource SoftButton}" FontSize="16" Click="Close_Click" />
+                </Grid>
+            </Border>
+
+            <TabControl x:Name="Pages" Grid.Row="1" Margin="12,8,12,12" Background="Transparent" BorderThickness="0" SelectionChanged="Pages_SelectionChanged">
+                <TabItem Header="今日">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="2,10,2,2">
+                            <DockPanel Margin="3,0,3,5">
+                                <Button DockPanel.Dock="Right" Content="管理课表" Style="{StaticResource MiniButton}" Click="ManageCourses_Click" />
+                                <StackPanel>
+                                    <TextBlock Text="今日课程" Style="{StaticResource SectionTitle}" />
+                                    <TextBlock x:Name="TeachingWeekText" Margin="0,3,0,0" FontSize="10.5" Foreground="{StaticResource PanelMuted}" />
+                                </StackPanel>
+                            </DockPanel>
+                            <StackPanel x:Name="CoursesPanel" />
+                            <DockPanel Margin="3,12,3,5">
+                                <TextBlock Text="今日清单" Style="{StaticResource SectionTitle}" />
+                                <TextBlock DockPanel.Dock="Right" Text="完成后保留 7 天" FontSize="10" Foreground="{StaticResource PanelMuted}" VerticalAlignment="Center" />
+                            </DockPanel>
+                            <StackPanel x:Name="TodosPanel" />
+                            <Grid Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <TextBox x:Name="TodoTextBox" Style="{StaticResource PanelTextBox}" KeyDown="TodoTextBox_KeyDown" />
+                                <Button x:Name="TodoCancelEditButton" Grid.Column="1" Content="取消" Visibility="Collapsed"
+                                        Style="{StaticResource SoftButton}" Padding="9,7" Click="CancelTodoEdit_Click" />
+                                <Button x:Name="TodoAddButton" Grid.Column="2" Content="添加" Style="{StaticResource PrimaryButton}"
+                                        Padding="11,7" Click="AddTodo_Click" />
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="提醒">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="2,10,2,2">
+                            <TextBlock Text="已设置提醒" Style="{StaticResource SectionTitle}" Margin="3,0,0,5" />
+                            <StackPanel x:Name="RemindersPanel" />
+                            <Border Height="1" Background="#E7E0F2" Margin="3,9" />
+                            <TextBlock Text="新建或编辑" Style="{StaticResource SectionTitle}" Margin="3,0,0,4" />
+                            <TextBox x:Name="ReminderMessageBox" Style="{StaticResource PanelTextBox}" Margin="0,2,0,5" ToolTip="提醒内容" TextChanged="ReminderTextChanged" />
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="82"/><ColumnDefinition Width="76"/></Grid.ColumnDefinitions>
+                                <DatePicker x:Name="ReminderDatePicker" SelectedDateFormat="Short" Style="{StaticResource PrettyDatePicker}" SelectedDateChanged="ReminderDateChanged" />
+                                <TextBlock x:Name="DailyRepeatHint" Grid.Column="0" Text="每天重复&#x0a;从下次到点开始" FontSize="11" Foreground="{StaticResource PanelMuted}" VerticalAlignment="Center" Margin="7,0,0,0" Visibility="Collapsed" />
+                                <TextBox x:Name="ReminderTimeBox" Grid.Column="1" Margin="4,0" Padding="5,6" TextAlignment="Center" Style="{StaticResource PanelTextBox}" Text="08:30" ToolTip="HH:mm" TextChanged="ReminderTextChanged" />
+                                <ComboBox x:Name="ReminderRepeatBox" Grid.Column="2" SelectedIndex="0" Style="{StaticResource PrettyRepeatBox}" ToolTip="提醒次数" SelectionChanged="ReminderRepeatBox_SelectionChanged">
+                                    <ComboBoxItem Content="单次" Style="{StaticResource PrettyRepeatItem}"/><ComboBoxItem Content="每天" Style="{StaticResource PrettyRepeatItem}"/>
+                                </ComboBox>
+                            </Grid>
+                            <Button Content="预览提醒" HorizontalAlignment="Right" Style="{StaticResource SoftButton}" Click="PreviewReminder_Click" />
+                            <Border x:Name="ReminderConfirmation" Margin="0,6,0,0" Padding="11" CornerRadius="12" Background="#F0EBFA" BorderBrush="#DED2F2" BorderThickness="1" Visibility="Collapsed">
+                                <StackPanel>
+                                    <TextBlock x:Name="ReminderPreviewText" TextWrapping="Wrap" Foreground="{StaticResource PanelText}" LineHeight="19" />
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                        <Button Content="取消" Style="{StaticResource MiniButton}" Click="CancelReminderPreview_Click" />
+                                        <Button Content="确认保存" Style="{StaticResource PrimaryButton}" Padding="10,5" Click="ConfirmReminder_Click" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="专注">
+                    <Grid Margin="2,10,2,2">
+                        <Border Background="#F5F1FC" CornerRadius="18" Padding="18" VerticalAlignment="Top">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Border Background="#E9E1F8" CornerRadius="12" Padding="12,5">
+                                    <TextBlock x:Name="PomodoroPhaseText" Text="专注" FontSize="13" FontWeight="SemiBold" Foreground="#624C91" />
+                                </Border>
+                                <TextBlock x:Name="PomodoroTimeText" Text="25:00" FontSize="46" FontWeight="Light" Foreground="#55436F" Margin="0,17,0,2" />
+                                <TextBlock x:Name="PomodoroRoundsText" Text="已完成 0 轮" Foreground="{StaticResource PanelMuted}" FontSize="11" />
+                                <WrapPanel x:Name="PomodoroButtons" HorizontalAlignment="Center" Margin="0,17,0,0">
+                                    <Button x:Name="PomodoroStartButton" Content="开始专注" Style="{StaticResource PrimaryButton}" Padding="17,8" Click="PomodoroStart_Click" />
+                                    <Button x:Name="PomodoroPauseButton" Content="暂停" Style="{StaticResource SoftButton}" Click="PomodoroPause_Click" Visibility="Collapsed" />
+                                    <Button x:Name="PomodoroResumeButton" Content="继续" Style="{StaticResource PrimaryButton}" Click="PomodoroResume_Click" Visibility="Collapsed" />
+                                    <Button x:Name="PomodoroNextButton" Content="开始下一阶段" Style="{StaticResource PrimaryButton}" Click="PomodoroNext_Click" Visibility="Collapsed" />
+                                    <Button x:Name="PomodoroCancelButton" Content="取消" Style="{StaticResource SoftButton}" Click="PomodoroCancel_Click" Visibility="Collapsed" />
+                                </WrapPanel>
+                                <Border Background="White" BorderBrush="#E3DAF1" BorderThickness="1" CornerRadius="11" Padding="10,8" Margin="0,15,0,0">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Text="每轮专注" VerticalAlignment="Center" Foreground="{StaticResource PanelText}" FontSize="12" />
+                                            <TextBox x:Name="FocusMinutesInput" Width="58" Height="34" Margin="8,0,5,0" Padding="5,5" TextAlignment="Center"
+                                                     Style="{StaticResource PanelTextBox}" ToolTip="1–240 分钟" KeyDown="FocusMinutesInput_KeyDown" />
+                                            <TextBlock Text="分钟" VerticalAlignment="Center" Foreground="{StaticResource PanelText}" FontSize="12" />
+                                            <Button Content="保存" Style="{StaticResource SoftButton}" Margin="9,0,0,0" Click="SaveFocusMinutes_Click" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="FocusMinutesFeedback" Text="修改后从下一轮专注生效" HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource PanelMuted}" FontSize="10.5" Margin="0,5,0,0" />
+                                    </StackPanel>
+                                </Border>
+                                <TextBlock Margin="0,16,0,0" Width="250" Text="每段结束后会先暂停，等你准备好再进入下一阶段。" TextWrapping="Wrap" TextAlignment="Center" Foreground="{StaticResource PanelMuted}" FontSize="11" LineHeight="18" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Border>
+</UserControl>

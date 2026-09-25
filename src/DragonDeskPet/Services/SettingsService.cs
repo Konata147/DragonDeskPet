@@ -31,6 +31,7 @@ public sealed class SettingsService
             var settings = JsonSerializer.Deserialize<AppSettings>(json, _jsonOptions) ?? new AppSettings();
             settings.ApiKey = WindowsSecretProtector.Unprotect(settings.ProtectedApiKey);
             settings.Scale = Math.Clamp(settings.Scale, 0.6, 2.0);
+            NormalizeProductivitySettings(settings);
             return settings;
         }
         catch (Exception)
@@ -43,11 +44,20 @@ public sealed class SettingsService
     {
         Directory.CreateDirectory(SettingsDirectory);
         settings.Scale = Math.Clamp(settings.Scale, 0.6, 2.0);
+        NormalizeProductivitySettings(settings);
         settings.ProtectedApiKey = WindowsSecretProtector.Protect(settings.ApiKey);
 
         var json = JsonSerializer.Serialize(settings, _jsonOptions);
         var temporaryPath = SettingsPath + ".tmp";
         File.WriteAllText(temporaryPath, json);
         File.Move(temporaryPath, SettingsPath, overwrite: true);
+    }
+
+    private static void NormalizeProductivitySettings(AppSettings settings)
+    {
+        settings.PomodoroFocusMinutes = Math.Clamp(settings.PomodoroFocusMinutes, 1, 240);
+        settings.PomodoroShortBreakMinutes = Math.Clamp(settings.PomodoroShortBreakMinutes, 1, 120);
+        settings.PomodoroLongBreakMinutes = Math.Clamp(settings.PomodoroLongBreakMinutes, 1, 180);
+        settings.PomodoroRoundsBeforeLongBreak = Math.Clamp(settings.PomodoroRoundsBeforeLongBreak, 1, 12);
     }
 }

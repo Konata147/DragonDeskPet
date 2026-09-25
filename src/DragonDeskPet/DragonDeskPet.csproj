@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>DragonDeskPet</AssemblyName>
     <RootNamespace>DragonDeskPet</RootNamespace>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\assets\icons\app.ico</ApplicationIcon>
@@ -21,6 +21,16 @@
              Exclude="..\..\assets\character\candidates\**\*.*"
              Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\course-template.csv"
+             Link="docs\course-template.csv"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\THIRD_PARTY_NOTICES.md"
+             Link="THIRD_PARTY_NOTICES.md"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ical.Net" Version="5.2.3" />
   </ItemGroup>
 
 </Project>

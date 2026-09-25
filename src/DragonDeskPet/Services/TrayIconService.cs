@@ -9,7 +9,7 @@ public sealed class TrayIconService : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly Icon? _customIcon;
 
-    public TrayIconService(Action show, Action hide, Action openSettings, Action exit, string? iconPath = null)
+    public TrayIconService(Action show, Action hide, Action openProductivity, Action openSettings, Action exit, string? iconPath = null)
     {
         if (iconPath is { Length: > 0 } resolvedIconPath && File.Exists(resolvedIconPath))
         {
@@ -27,6 +27,7 @@ public sealed class TrayIconService : IDisposable
         menu.Items.Add("显示桌宠", null, (_, _) => show());
         menu.Items.Add("隐藏桌宠", null, (_, _) => hide());
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("效率助手", null, (_, _) => openProductivity());
         menu.Items.Add("设置", null, (_, _) => openSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => exit());
@@ -39,6 +40,14 @@ public sealed class TrayIconService : IDisposable
             Visible = true
         };
         _notifyIcon.DoubleClick += (_, _) => show();
+    }
+
+    public void ShowNotification(string title, string message)
+    {
+        _notifyIcon.BalloonTipTitle = title;
+        _notifyIcon.BalloonTipText = message;
+        _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
+        _notifyIcon.ShowBalloonTip(5000);
     }
 
     public void Dispose()
