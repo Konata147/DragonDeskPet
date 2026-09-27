@@ -5,14 +5,95 @@ using Ical.Net;
 using Ical.Net.DataTypes;
 using Ical.Net.Evaluation;
 using Microsoft.VisualBasic.FileIO;
+using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace DragonDeskPet.Services;
 
-public sealed class CourseScheduleImporter : ICourseScheduleImporter
+public sealed partial class CourseScheduleImporter : ICourseScheduleImporter
 {
     private readonly IProductivityStore _store;
 
     public CourseScheduleImporter(IProductivityStore store) => _store = store;
+
+    public Task<CourseImportPreview> PreviewAsync(string path, IReadOnlyList<CourseItem> existingCourses, SemesterSettings semester,
+        int sheetIndex = 0, CancellationToken cancellationToken = default) => Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = Path.GetExtension(path).ToLowerInvariant() is ".xls" or ".xlsx"
+                ? Classify(ParseExcel(path, sheetIndex, semester, cancellationToken), existingCourses)
+                : Preview(path, existingCourses, semester);
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }, cancellationToken);
+
+    public static CourseImportPreview Classify(IEnumerable<CourseImportRow> rows, IReadOnlyList<CourseItem> existingCourses)
+    {
+        var preview = new CourseImportPreview();
+        var seen = existingCourses.ToList();
+        var batchIds = new HashSet<Guid>();
+        foreach (var row in rows)
+        {
+            if (row.Course is not { } course || row.Disposition == CourseImportDisposition.Invalid)
+            { preview.Rows.Add(row); continue; }
+            var existing = FindExisting(seen, course);
+            var disposition = existing is null ? CourseImportDisposition.Add
+                : IsEquivalent(existing, course) ? CourseImportDisposition.Duplicate : CourseImportDisposition.Update;
+            if (existing is not null) course.Id = existing.Id;
+            if (disposition == CourseImportDisposition.Update && batchIds.Contains(course.Id))
+            {
+                preview.Rows.Add(row with { Disposition = CourseImportDisposition.Invalid,
+                    ErrorMessage = "同一批导入有相同课程时段但不同内容，请核对后排除其中一条。" });
+                continue;
+            }
+            preview.Rows.Add(row with { Disposition = disposition });
+            batchIds.Add(course.Id);
+            seen.RemoveAll(c => c.Id == course.Id);
+            seen.Add(course);
+        }
+        return preview;
+    }
+
+    public string ScheduleFingerprint()
+    {
+        var courses = CourseDataCopy.Clone(_store.Data.Courses);
+        foreach (var c in courses) c.LastAlertedDate = null;
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            JsonSerializer.Serialize(new { Courses = courses, _store.Data.Semester, _store.Data.CourseAdjustments }))));
+    }
+
+    private void SaveOrRestore(ProductivityData before)
+    {
+        try { _store.Save(); }
+        catch
+        {
+            _store.Data.Courses = before.Courses;
+            _store.Data.Semester = before.Semester;
+            _store.Data.CourseAdjustments = before.CourseAdjustments;
+            _store.Data.PendingAlerts = before.PendingAlerts;
+            _store.Data.LastCourseImport = before.LastCourseImport;
+            _store.Data.LastCourseSchedulerCheckUtc = before.LastCourseSchedulerCheckUtc;
+            _store.Data.NotifiedCourseOccurrences = before.NotifiedCourseOccurrences;
+            throw;
+        }
+    }
+
+    public void Undo()
+    {
+        var snapshot = _store.Data.LastCourseImport ?? throw new InvalidOperationException("没有可撤销的导入。");
+        var before = CourseDataCopy.Clone(_store.Data);
+        // Preserve notification history outside the schedule snapshot; never revive old alerts.
+        foreach (var course in _store.Data.Courses.Where(c => c.LastAlertedDate is not null))
+            _store.Data.NotifiedCourseOccurrences.Add($"{course.Id:N}:{course.LastAlertedDate:yyyy-MM-dd}");
+        _store.Data.Courses = CourseDataCopy.Clone(snapshot.Courses);
+        _store.Data.Semester = CourseDataCopy.Clone(snapshot.Semester);
+        _store.Data.CourseAdjustments = CourseDataCopy.Clone(snapshot.Adjustments);
+        _store.Data.PendingAlerts.RemoveAll(a => a.Source == AlertSource.Course);
+        _store.Data.LastCourseSchedulerCheckUtc = DateTimeOffset.UtcNow;
+        _store.Data.LastCourseImport = null;
+        SaveOrRestore(before);
+    }
 
     public CourseImportPreview Preview(string path, IReadOnlyList<CourseItem> existingCourses, SemesterSettings semester)
     {
@@ -25,34 +106,20 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
 
         try
         {
-            var imported = Path.GetExtension(path).Equals(".ics", StringComparison.OrdinalIgnoreCase)
-                ? ParseIcs(path, semester)
-                : ParseCsv(path);
-            foreach (var result in imported)
+            if (new FileInfo(path).Length > 20 * 1024 * 1024) throw new ArgumentException("课表文件超过20 MiB，请导出较小文件。");
+            var imported = Path.GetExtension(path).ToLowerInvariant() switch
             {
-                if (result.Course is null)
-                {
-                    preview.Rows.Add(result);
-                    continue;
-                }
-
-                var existing = FindExisting(existingCourses, result.Course);
-                var disposition = existing is null
-                    ? CourseImportDisposition.Add
-                    : IsEquivalent(existing, result.Course)
-                        ? CourseImportDisposition.Duplicate
-                        : CourseImportDisposition.Update;
-                if (existing is not null)
-                {
-                    result.Course.Id = existing.Id;
-                }
-
-                preview.Rows.Add(result with { Disposition = disposition });
-            }
+                ".ics" => ParseIcs(path, semester),
+                ".csv" => ParseCsv(path),
+                ".xls" or ".xlsx" => ParseExcel(path, 0, semester, CancellationToken.None),
+                _ => throw new ArgumentException("不支持此文件格式，请选择 ICS、CSV、XLS 或 XLSX。")
+            };
+            return Classify(imported, existingCourses);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Invalid, null, Path.GetFileName(path), exception.Message));
+            preview.Rows.Add(new CourseImportRow(CourseImportDisposition.Invalid, null, Path.GetFileName(path),
+                CourseImportErrors.Describe(exception)));
         }
 
         return preview;
@@ -70,6 +137,16 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
         {
             return;
         }
+
+        foreach (var course in accepted) CourseScheduleService.Validate(course, _store.Data.Semester);
+        var before = CourseDataCopy.Clone(_store.Data);
+        var snapshot = new CourseImportSnapshot
+        {
+            ImportedAtUtc = DateTimeOffset.UtcNow,
+            Courses = CourseDataCopy.Clone(_store.Data.Courses),
+            Semester = CourseDataCopy.Clone(_store.Data.Semester),
+            Adjustments = CourseDataCopy.Clone(_store.Data.CourseAdjustments)
+        };
 
         var nextCourses = replaceCurrentSemester
             ? new List<CourseItem>()
@@ -96,6 +173,9 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
         }
 
         _store.Data.Courses = nextCourses;
+        var updatedIds = accepted.Select(c => c.Id).ToHashSet();
+        _store.Data.PendingAlerts.RemoveAll(a => a.Source == AlertSource.Course && a.SourceId is { } id && updatedIds.Contains(id));
+        _store.Data.CourseAdjustments.RemoveAll(a => !nextCourses.Any(c => c.Id == a.CourseId));
         if (replaceCurrentSemester)
         {
             var retainedIds = nextCourses.Select(course => course.Id).ToHashSet();
@@ -105,7 +185,9 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
                 && !retainedIds.Contains(sourceId));
         }
 
-        _store.Save();
+        snapshot.AfterFingerprint = ScheduleFingerprint();
+        _store.Data.LastCourseImport = snapshot;
+        SaveOrRestore(before);
     }
 
     private static List<CourseImportRow> ParseIcs(string path, SemesterSettings semester)
@@ -255,6 +337,8 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
 
     private static CourseItem? FindExisting(IEnumerable<CourseItem> courses, CourseItem candidate)
     {
+        var byId = courses.FirstOrDefault(c => c.Id == candidate.Id);
+        if (byId is not null) return byId;
         if (!string.IsNullOrWhiteSpace(candidate.ExternalId))
         {
             var byExternalId = courses.FirstOrDefault(course => course.ExternalId == candidate.ExternalId);
@@ -267,8 +351,11 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
         return courses.FirstOrDefault(course =>
             course.Name.Equals(candidate.Name, StringComparison.OrdinalIgnoreCase)
             && course.DayOfWeek == candidate.DayOfWeek
-            && course.StartTime == candidate.StartTime
-            && course.EndTime == candidate.EndTime);
+            && course.StartWeek == candidate.StartWeek && course.EndWeek == candidate.EndWeek
+            && course.WeekPattern == candidate.WeekPattern && course.Weeks.SetEquals(candidate.Weeks)
+            && course.IncludedDates.SetEquals(candidate.IncludedDates)
+            && course.StartPeriod == candidate.StartPeriod && course.EndPeriod == candidate.EndPeriod
+            && (course.StartPeriod is not null || course.StartTime == candidate.StartTime && course.EndTime == candidate.EndTime));
     }
 
     private static bool IsEquivalent(CourseItem left, CourseItem right) =>
@@ -277,11 +364,20 @@ public sealed class CourseScheduleImporter : ICourseScheduleImporter
         && left.StartTime == right.StartTime
         && left.EndTime == right.EndTime
         && left.Location == right.Location
-        && left.Teacher == right.Teacher
+        && TeacherNames(left.Teacher).SetEquals(TeacherNames(right.Teacher))
+        && left.IsEnabled == right.IsEnabled && left.ReminderMinutes == right.ReminderMinutes
         && left.StartWeek == right.StartWeek
         && left.EndWeek == right.EndWeek
         && left.WeekPattern == right.WeekPattern
+        && left.StartPeriod == right.StartPeriod && left.EndPeriod == right.EndPeriod
+        && left.Weeks.SetEquals(right.Weeks)
         && left.IncludedDates.SetEquals(right.IncludedDates);
+
+    // A list of co-teachers is unordered. Normalize only explicit list separators;
+    // retain spaces within a name, and leave the original display text untouched.
+    private static HashSet<string> TeacherNames(string value) => value
+        .Split([',', '，', '、', ';', '；', '\r', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .ToHashSet(StringComparer.Ordinal);
 
     private static int ParseInt(string value, string field) =>
         int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)

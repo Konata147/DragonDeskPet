@@ -2,15 +2,33 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 using DragonDeskPet.Core;
+using DragonDeskPet.Services;
 
 namespace DragonDeskPet;
 
 public partial class CourseImportPreviewWindow : Window
 {
-    public CourseImportPreviewWindow(CourseImportPreview preview)
+    private readonly CourseImportPreview _preview;
+    private readonly IProductivityStore? _store;
+    public CourseImportPreviewWindow(CourseImportPreview preview, IProductivityStore? store = null)
     {
+        _preview = preview; _store = store;
         InitializeComponent();
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        var preview = _preview;
         SummaryText.Text = $"新增 {preview.AddedCount} · 更新 {preview.UpdatedCount} · 重复 {preview.DuplicateCount} · 无效 {preview.InvalidCount}";
+        if (_store is not null)
+        {
+            var incoming = preview.Rows.Where(r => r.Course is not null && r.Disposition != CourseImportDisposition.Invalid)
+                .Select(r => r.Course!).GroupBy(c => c.Id).Select(g => g.Last()).ToList();
+            var courses = _store.Data.Courses.Where(c => incoming.All(i => i.Id != c.Id)).Concat(incoming).ToList();
+            var conflicts = CourseScheduleService.FindConflicts(courses, _store.Data.Semester, _store.Data.CourseAdjustments);
+            SummaryText.Text += $"\n按合并方案：{conflicts.Count}处实际时间冲突（导入前确认）";
+        }
         RowsList.ItemsSource = preview.Rows.Select(row => new CourseImportDisplayRow(row)).ToList();
         var hasMergeChanges = preview.AddedCount + preview.UpdatedCount > 0;
         var hasReplacementRecords = hasMergeChanges || preview.DuplicateCount > 0;
@@ -22,10 +40,42 @@ public partial class CourseImportPreviewWindow : Window
         EmptyNotice.Visibility = hasMergeChanges ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    private void Reclassify()
+    {
+        var rows = CourseScheduleImporter.Classify(_preview.Rows, _store?.Data.Courses ?? []);
+        _preview.Rows.Clear(); _preview.Rows.AddRange(rows.Rows); Refresh();
+    }
+
+    private void Edit_Click(object sender, RoutedEventArgs e)
+    {
+        if (RowsList.SelectedItem is not CourseImportDisplayRow selected) return;
+        var result = CourseFormWindow.EditCourse(this, selected.Row.Course, _store?.Data.Semester ?? new SemesterSettings());
+        if (result is null) return;
+        var index = _preview.Rows.IndexOf(selected.Row);
+        _preview.Rows[index] = new CourseImportRow(CourseImportDisposition.Add, result, selected.SourceDescription);
+        Reclassify();
+    }
+
+    private void Exclude_Click(object sender, RoutedEventArgs e)
+    {
+        if (RowsList.SelectedItem is not CourseImportDisplayRow selected) return;
+        _preview.Rows.Remove(selected.Row); Reclassify();
+    }
+
+    private bool ConfirmConflicts(bool replace)
+    {
+        if (_store is null) return true;
+        var incoming = _preview.Rows.Where(r => r.Course is not null && r.Disposition != CourseImportDisposition.Invalid).Select(r => r.Course!).GroupBy(c => c.Id).Select(g => g.Last()).ToList();
+        var items = replace ? incoming : _store.Data.Courses.Where(c => incoming.All(i => i.Id != c.Id)).Concat(incoming).ToList();
+        var conflicts = CourseScheduleService.FindConflicts(items, _store.Data.Semester, _store.Data.CourseAdjustments);
+        return conflicts.Count == 0 || new ConfirmActionWindow("发现课程冲突", string.Join("\n", conflicts.Take(6).Select(c => c.Description)) + $"\n共{conflicts.Count}处。仍然保留这些安排？", "仍然导入") { Owner = this }.ShowDialog() == true;
+    }
+
     public bool ReplaceCurrentSemester { get; private set; }
 
     private void Merge_Click(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmConflicts(false)) return;
         ReplaceCurrentSemester = false;
         DialogResult = true;
     }
@@ -42,6 +92,7 @@ public partial class CourseImportPreviewWindow : Window
         }
 
         ReplaceCurrentSemester = true;
+        if (!ConfirmConflicts(true)) return;
         DialogResult = true;
     }
 
@@ -82,7 +133,9 @@ public sealed record CourseImportDisplayRow(CourseImportRow Row)
                 CourseWeekPattern.Even => "双周",
                 _ => "全部周"
             };
-            return $"{day} {course.StartTime:HH:mm}–{course.EndTime:HH:mm} · 第 {course.StartWeek}–{course.EndWeek} 周 · {pattern}";
+            var time = course.StartPeriod is { } period ? $"第{period}–{course.EndPeriod}节（冬夏自动）" : $"{course.StartTime:HH:mm}–{course.EndTime:HH:mm}";
+            var weeks = course.Weeks.Count > 0 ? string.Join(",", course.Weeks.Order()) : $"{course.StartWeek}–{course.EndWeek}";
+            return $"{day} {time} · 第 {weeks} 周 · {pattern}";
         }
     }
 

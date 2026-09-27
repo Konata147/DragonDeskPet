@@ -65,6 +65,10 @@ public interface ICourseScheduleService
 {
     int GetTeachingWeek(DateOnly date);
     IReadOnlyList<CourseOccurrence> GetCoursesForDate(DateOnly date);
+    IReadOnlyList<CourseOccurrence> GetCoursesForRange(DateOnly start, DateOnly end, bool includeCancelled = false);
+    void SaveAdjustment(CourseAdjustment change);
+    void RemoveAdjustment(Guid id);
+    IReadOnlyList<CourseConflict> CheckCourse(CourseItem course);
     void AddOrUpdate(CourseItem course);
     void Delete(Guid id);
     void SetEnabled(Guid id, bool enabled);
@@ -74,8 +78,11 @@ public interface ICourseScheduleService
 
 public interface ICourseScheduleImporter
 {
+    Task<CourseImportPreview> PreviewAsync(string path, IReadOnlyList<CourseItem> existingCourses, SemesterSettings semester,
+        int sheetIndex = 0, CancellationToken cancellationToken = default);
     CourseImportPreview Preview(string path, IReadOnlyList<CourseItem> existingCourses, SemesterSettings semester);
     void Apply(CourseImportPreview preview, bool replaceCurrentSemester);
+    void Undo();
 }
 
 public interface ISystemActionService

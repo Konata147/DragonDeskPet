@@ -27,6 +27,7 @@ public partial class ProductivityBubble : UserControl
     private Guid? _editingReminderId;
     private Guid? _editingTodoId;
     private readonly DispatcherTimer _displayTimer;
+    private DateTime _lastCourseRefresh;
 
     public ProductivityBubble()
     {
@@ -34,7 +35,11 @@ public partial class ProductivityBubble : UserControl
         ReminderDatePicker.SelectedDate = DateTime.Today;
         UpdateReminderRepeatMode();
         _displayTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _displayTimer.Tick += (_, _) => RefreshPomodoro();
+        _displayTimer.Tick += (_, _) =>
+        {
+            RefreshPomodoro();
+            if (IsVisible && DateTime.Now - _lastCourseRefresh >= TimeSpan.FromMinutes(1)) RefreshToday();
+        };
         _displayTimer.Start();
     }
 
@@ -47,6 +52,7 @@ public partial class ProductivityBubble : UserControl
         _reminders = reminders;
         _todos = todos;
         _courses = courses;
+        _courses.Changed += (_, _) => Dispatcher.BeginInvoke(RefreshToday);
         _pomodoro = pomodoro;
         FocusMinutesInput.Text = ((App)Application.Current).Settings.PomodoroFocusMinutes.ToString(CultureInfo.InvariantCulture);
         _pomodoro.StateChanged += (_, _) => Dispatcher.BeginInvoke(RefreshAll);
@@ -100,11 +106,18 @@ public partial class ProductivityBubble : UserControl
         }
 
         var today = DateOnly.FromDateTime(DateTime.Today);
+        _lastCourseRefresh = DateTime.Now;
         _todos.Maintain(today);
         var week = _courses.GetTeachingWeek(today);
         TeachingWeekText.Text = week > 0 ? $"第 {week} 教学周" : "学期尚未开始";
         CoursesPanel.Children.Clear();
         var courses = _courses.GetCoursesForDate(today);
+        var now = TimeOnly.FromDateTime(DateTime.Now);
+        var active = courses.Where(c => c.StartTime <= now && c.EndTime > now).ToList();
+        var next = courses.FirstOrDefault(c => c.StartTime > now);
+        NextCourseText.Text = (active.Count > 0 ? "正在上课：" + string.Join("、", active.Select(c => c.Course.Name)) + "\n" : "")
+            + (next is not null ? $"下一节：{next.Course.Name}\n{next.StartTime:HH:mm} · {next.Location} · 还有 {Math.Ceiling((next.StartTime - now).TotalMinutes)} 分钟"
+                : courses.Count == 0 ? "今天没有课程" : active.Count > 0 ? "今天没有后续课程" : "今日课程已结束");
         if (courses.Count == 0)
         {
             CoursesPanel.Children.Add(EmptyText("今天没有课程安排。"));
@@ -133,7 +146,8 @@ public partial class ProductivityBubble : UserControl
                 });
                 details.Children.Add(new TextBlock
                 {
-                    Text = $"{occurrence.Course.StartTime:HH:mm}–{occurrence.Course.EndTime:HH:mm}{(string.IsNullOrWhiteSpace(occurrence.Course.Location) ? string.Empty : $"  ·  {occurrence.Course.Location}")}",
+                    Text = $"{occurrence.StartTime:HH:mm}–{occurrence.EndTime:HH:mm} · {occurrence.Location}{(occurrence.AdjustmentId is null ? "" : occurrence.IsMakeup ? " · 补课" : " · 调课")}",
+                    TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 3, 0, 0),
                     FontSize = 10.5,
                     Foreground = new SolidColorBrush(Color.FromRgb(126, 112, 140))

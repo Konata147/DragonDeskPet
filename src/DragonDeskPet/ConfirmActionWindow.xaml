@@ -60,8 +60,10 @@
                 <Button Grid.Column="2" Content="×" Padding="0" Width="27" Height="27" FontSize="15"
                         Style="{StaticResource CancelButtonStyle}" Click="Cancel_Click" ToolTip="取消" />
             </Grid>
-            <TextBlock x:Name="MessageText" Grid.Row="1" TextWrapping="Wrap" LineHeight="21" FontSize="12.5"
-                       Foreground="#6A5F77" Margin="0,15,0,20" />
+            <ScrollViewer Grid.Row="1" MaxHeight="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,15,0,20">
+                <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}" /></ScrollViewer.Resources>
+                <TextBlock x:Name="MessageText" TextWrapping="Wrap" LineHeight="21" FontSize="12.5" Foreground="#6A5F77" Margin="0,0,7,5" />
+            </ScrollViewer>
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="CancelButton" Content="取消" IsCancel="True" IsDefault="True"
                         Style="{StaticResource CancelButtonStyle}" Click="Cancel_Click" />

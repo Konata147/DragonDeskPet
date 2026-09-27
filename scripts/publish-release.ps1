@@ -11,6 +11,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'environment.ps1')
+. (Join-Path $PSScriptRoot 'get-ocr-models.ps1')
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $projectRoot 'src\DragonDeskPet\DragonDeskPet.csproj'

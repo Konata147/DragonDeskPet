@@ -20,6 +20,71 @@ if (args is ["--single-instance-signal", var instanceName])
 }
 
 var failures = new List<string>();
+if (args is ["--ocr-sample", var imagePath])
+{
+    try
+    {
+    var watch = Stopwatch.StartNew();
+    var preview = await new CourseImageImporter().PreviewAsync(imagePath, new SemesterSettings { StartDate = new DateOnly(2026, 9, 6) }, new Progress<string>(Console.WriteLine));
+    Console.WriteLine($"OCR candidates={preview.Rows.Count}; ReviewRequired={preview.InvalidCount}; Elapsed={watch.Elapsed.TotalSeconds:F1}s");
+    Console.WriteLine($"RecoveredPeriodRows={preview.Rows.Count(r => r.Course?.StartPeriod is not null)}; IncompleteNames={preview.Rows.Count(r => r.Course?.Name.Contains('…') == true || r.Course?.Name.Contains("...") == true)}");
+    return preview.Rows.Any(r => r.Course is not null) ? 0 : 1;
+    }
+    catch (Exception ex) { Console.WriteLine("OCR check failed: " + ex.GetType().Name); return 1; }
+}
+if (args is ["--render-ui", var renderDirectory]) return CourseLayoutChecks.Render(renderDirectory);
+if (args is ["--probe-school-navigation"]) return SchoolNavigationProbe.Run();
+if (args is ["--test-school-redirect"]) return SchoolNavigationProbe.Run(syntheticRedirect: true);
+if (args is ["--course-sample", var samplePath])
+{
+    var sampleStore = new ProductivityStore(Path.Combine(AppContext.BaseDirectory, "test-data", Guid.NewGuid().ToString("N")));
+    sampleStore.Data.Semester.StartDate = new DateOnly(2026, 9, 6);
+    var preview = new CourseScheduleImporter(sampleStore).Preview(samplePath, [], sampleStore.Data.Semester);
+    var sampleCourses = preview.Rows.Where(r => r.Course is not null && r.Disposition != CourseImportDisposition.Invalid).Select(r => r.Course!).ToList();
+    Console.WriteLine($"Courses={sampleCourses.Select(c => c.Name).Distinct().Count()}; Arrangements={sampleCourses.Count}; NotesOrInvalid={preview.InvalidCount}; HasClockPeriods={sampleCourses.All(c => c.StartPeriod is not null)}");
+    return sampleCourses.Count == 13 && sampleCourses.Select(c => c.Name).Distinct().Count() == 7 ? 0 : 1;
+}
+
+await RunAsync("V0.4 school navigation diagnostics preserve blocked reasons and ignore stale errors", () =>
+{
+    SchoolNavigationTests.Run(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 co-teacher ordering and separators do not cause false updates", () =>
+{
+    CourseTeacherTests.Run(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 school HTTP redirect returns to HTTPS once without relaxing origin policy", () =>
+{
+    SchoolNavigationTests.Recovery(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 seasonal periods, week gaps, adjustments and conflicts", () =>
+{
+    CourseV04Tests.Scheduling();
+    return Task.CompletedTask;
+});
+await RunAsync("V0.4 school grid, exact weeks, persistent undo and migration", () =>
+{
+    CourseV04Tests.ImportAndUndo();
+    return Task.CompletedTask;
+});
+await RunAsync("V0.4 Sunday boundary, moved reminders, missing periods and school origin", () =>
+{
+    CourseV04Tests.BoundariesAndAlerts(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 failed import restores in-memory schedule", () =>
+{
+    CourseV04Tests.SaveFailureRollsBack(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 XLSX sheets, merged title, duplicate and damaged files", CourseFileTests.ExcelAsync);
+await RunAsync("V0.4 OCR cancellation, uncertain candidates and official runtime URL", CourseFileTests.OcrAndRuntimeAsync);
+await RunAsync("V0.4 weekly periods align seasonal makeup without changing clocks", () =>
+{
+    CourseWeekLayoutTests.Run(); return Task.CompletedTask;
+});
+await RunAsync("V0.4 locked Excel gives actionable feedback without changing data", () =>
+{
+    CourseFileTests.LockedFile(); return Task.CompletedTask;
+});
 
 await RunAsync("state machine transitions exactly once", () =>
 {

@@ -7,6 +7,7 @@ namespace DragonDeskPet.Services;
 public sealed class ProductivityStore : IProductivityStore
 {
     private readonly object _gate = new();
+    private bool _requiresMigrationBackup;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         WriteIndented = true,
@@ -29,9 +30,14 @@ public sealed class ProductivityStore : IProductivityStore
         lock (_gate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(DataPath)!);
+            if (_requiresMigrationBackup && File.Exists(DataPath))
+            {
+                if (!File.Exists(DataPath + ".pre-v0.4.bak")) File.Copy(DataPath, DataPath + ".pre-v0.4.bak", overwrite: false);
+            }
             var temporaryPath = DataPath + ".tmp";
             File.WriteAllText(temporaryPath, JsonSerializer.Serialize(Data, _jsonOptions));
             File.Move(temporaryPath, DataPath, overwrite: true);
+            _requiresMigrationBackup = false;
         }
     }
 
@@ -65,14 +71,22 @@ public sealed class ProductivityStore : IProductivityStore
             data.Todos ??= [];
             data.Courses ??= [];
             data.Semester ??= new SemesterSettings();
+            data.Semester.Timetable ??= SeasonalTimetable.CreateHnie();
+            data.CourseAdjustments ??= [];
+            data.NotifiedCourseOccurrences ??= [];
             data.Pomodoro ??= new PomodoroState();
             foreach (var course in data.Courses)
             {
                 course.ExcludedDates ??= [];
                 course.IncludedDates ??= [];
+                course.Weeks ??= [];
             }
 
-            data.SchemaVersion = 1;
+            if (data.SchemaVersion < 2)
+            {
+                _requiresMigrationBackup = true;
+                data.SchemaVersion = 2;
+            }
             return data;
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)

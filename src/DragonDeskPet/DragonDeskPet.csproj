@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>DragonDeskPet</AssemblyName>
     <RootNamespace>DragonDeskPet</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.4.0-dev</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\assets\icons\app.ico</ApplicationIcon>
@@ -27,10 +27,25 @@
     <Content Include="..\..\THIRD_PARTY_NOTICES.md"
              Link="THIRD_PARTY_NOTICES.md"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\docs\licenses\*.txt" Link="licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="$(NuGetPackageRoot)/skiasharp.nativeassets.win32/3.119.1/*LICENSE*.txt;$(NuGetPackageRoot)/skiasharp.nativeassets.win32/3.119.1/*NOTICES*.txt"
+             Link="licenses/SkiaSharp/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)/microsoft.ml.onnxruntime/1.29.0/LICENSE;$(NuGetPackageRoot)/microsoft.ml.onnxruntime/1.29.0/ThirdPartyNotices.txt"
+             Link="licenses/OnnxRuntime/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)/microsoft.web.webview2/1.0.3650.58/LICENSE.txt;$(NuGetPackageRoot)/microsoft.web.webview2/1.0.3650.58/NOTICE.txt"
+             Link="licenses/WebView2/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)/clipper2/2.0.0/License.txt"
+             Link="licenses/Clipper2/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="$(NuGetPackageRoot)/system.text.encoding.codepages/8.0.0/LICENSE.TXT;$(NuGetPackageRoot)/system.text.encoding.codepages/8.0.0/THIRD-PARTY-NOTICES.TXT"
+             Link="licenses/Dotnet/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Ical.Net" Version="5.2.3" />
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="RapidOcrNet" Version="4.2.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3650.58" />
   </ItemGroup>
 
 </Project>

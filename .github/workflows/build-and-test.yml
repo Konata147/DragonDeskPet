@@ -41,8 +41,15 @@ jobs:
       - name: Restore
         run: dotnet restore DragonDeskPet.sln
 
+      - name: Fetch checksum-pinned local OCR models
+        shell: pwsh
+        run: ./scripts/get-ocr-models.ps1
+
       - name: Build with zero warnings
         run: dotnet build DragonDeskPet.sln --configuration Debug --no-restore -warnaserror
 
       - name: Run smoke tests
         run: dotnet run --project tests/DragonDeskPet.SmokeTests/DragonDeskPet.SmokeTests.csproj --configuration Debug --no-build
+
+      - name: Verify Release with zero warnings
+        run: dotnet build DragonDeskPet.sln --configuration Release --no-restore -warnaserror

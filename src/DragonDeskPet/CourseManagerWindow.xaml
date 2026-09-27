@@ -6,6 +6,7 @@
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize" ShowInTaskbar="False"
         Background="#F5F1FA" FontFamily="Microsoft YaHei UI">
     <Window.Resources>
+        <Style TargetType="ScrollBar" BasedOn="{StaticResource CourseAdaptiveScrollBar}" />
         <local:CourseDayDisplayConverter x:Key="CourseDayDisplay" />
         <Style x:Key="CourseButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand" /><Setter Property="Padding" Value="12,7" /><Setter Property="Margin" Value="3" />
@@ -29,6 +30,24 @@
                 <ControlTemplate.Triggers>
                     <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#7558C4" /></Trigger>
                     <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#674AAD" /></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="WeekCourseCard" TargetType="Button" BasedOn="{StaticResource CourseButton}">
+            <Setter Property="Margin" Value="3,0,3,10" />
+            <Setter Property="Padding" Value="10,11" />
+            <Setter Property="Background" Value="#FFFCFF" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+                <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="#DDD2EE"
+                        BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Top" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#F0E9FC" /><Setter TargetName="Surface" Property="BorderBrush" Value="#AD94D5" /></Trigger>
+                    <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#E7DCF8" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#8466D3" /></Trigger>
                 </ControlTemplate.Triggers>
             </ControlTemplate></Setter.Value></Setter>
         </Style>
@@ -152,7 +171,7 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="182" />
+            <RowDefinition x:Name="ListRow" Height="182" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -165,11 +184,23 @@
                     <TextBlock Text="学期开始" Style="{StaticResource CourseLabel}" />
                     <DatePicker x:Name="SemesterStartPicker" Grid.Column="1" Style="{StaticResource CourseDate}" SelectedDateChanged="SemesterStartPicker_Changed" />
                     <TextBlock Grid.Column="2" Text="用于计算教学周" Style="{StaticResource CourseLabel}" Margin="10,0,0,0" />
-                    <Button Grid.Column="3" Content="导入 ICS / CSV" Style="{StaticResource CourseButton}" Click="Import_Click" />
+                    <Button Grid.Column="3" Content="导入文件" Style="{StaticResource CourseButton}" Click="Import_Click" />
                 </Grid>
             </Border>
+            <WrapPanel Margin="0,7,0,0">
+                <Button Content="列表 / 周课表" Style="{StaticResource CourseButton}" Click="ToggleWeek_Click" />
+                <Button Content="上一周" Style="{StaticResource CourseButton}" Click="PreviousWeek_Click" />
+                <Button Content="本周" Style="{StaticResource CourseButton}" Click="ThisWeek_Click" />
+                <Button Content="下一周" Style="{StaticResource CourseButton}" Click="NextWeek_Click" />
+                <Button Content="冬夏作息" Style="{StaticResource CourseButton}" Click="Timetable_Click" />
+                <Button Content="撤销导入" Style="{StaticResource CourseButton}" Click="UndoImport_Click" />
+                <Button Content="图片识图" Style="{StaticResource CourseButton}" Click="ImageImport_Click" />
+                <Button Content="教务导入" Style="{StaticResource CourseButton}" Click="SchoolImport_Click" />
+                <Button Content="学校学期预设" Style="{StaticResource CourseButton}" Click="SchoolPreset_Click" />
+            </WrapPanel>
+            <TextBlock x:Name="WeekHeading" TextWrapping="Wrap" Foreground="#6B5689" Margin="3,4" />
         </StackPanel>
-        <Border Grid.Row="1" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
+        <Border x:Name="ListSurface" Grid.Row="1" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
         <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -182,8 +213,8 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Margin="6,4">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#403653" />
-                            <TextBlock FontSize="11" Foreground="#776A86">
+                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#403653" />
+                            <TextBlock FontSize="11" Foreground="#776A86" TextWrapping="Wrap">
                                 <Run Text="{Binding DayOfWeek, Converter={StaticResource CourseDayDisplay}}" /><Run Text="  " />
                                 <Run Text="{Binding StartTime}" /><Run Text="–" /><Run Text="{Binding EndTime}" />
                                 <Run Text="  " /><Run Text="{Binding Location}" />
@@ -196,10 +227,11 @@
                 <Button Content="新建" Width="92" Style="{StaticResource CoursePrimaryButton}" Click="New_Click" />
                 <Button Content="今天停课" Width="92" Style="{StaticResource CourseButton}" Click="SkipToday_Click" />
                 <Button Content="删除" Width="92" Style="{StaticResource CourseButton}" Click="Delete_Click" />
+                <Button Content="完整编辑" Width="92" Style="{StaticResource CourseButton}" Click="AdvancedEdit_Click" />
             </StackPanel>
         </Grid>
         </Border>
-        <Border Grid.Row="2" Margin="0,12,0,0" Padding="14" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
+        <Border x:Name="EditorSurface" Grid.Row="2" Margin="0,12,0,0" Padding="14" Background="White" BorderBrush="#E4DAF1" BorderThickness="1" CornerRadius="14">
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <ScrollViewer.Resources>
                 <Style TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}" />
@@ -235,13 +267,25 @@
                 <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal"><TextBox x:Name="ReminderMinutesBox" Width="60" Text="30" Margin="3,3,0,5" TextAlignment="Center"/><TextBlock Text="分钟" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="#81758E"/></StackPanel>
                 <CheckBox x:Name="ReminderEnabledBox" Grid.Row="5" Grid.Column="2" Grid.ColumnSpan="2" Content="启用课程提醒" IsChecked="True" VerticalAlignment="Center" Foreground="#403653" />
                 <CheckBox x:Name="CourseEnabledBox" Grid.Row="6" Grid.ColumnSpan="2" Content="启用这门课程" IsChecked="True" Margin="3,8,0,0" Foreground="#403653" />
-                <TextBlock x:Name="ValidationText" Grid.Row="7" Grid.ColumnSpan="4" Foreground="#B34B69" TextWrapping="Wrap" Margin="3,7,3,0" />
             </Grid>
             </ScrollViewer>
         </Border>
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="保存课程" Style="{StaticResource CoursePrimaryButton}" Click="SaveCourse_Click" />
+        <ScrollViewer x:Name="WeekSurface" Grid.Row="1" Grid.RowSpan="2" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="0,8">
+            <Grid x:Name="WeekColumns" Width="1180" VerticalAlignment="Top" />
+        </ScrollViewer>
+        <StackPanel Grid.Row="3" Margin="0,12,0,0">
+            <ScrollViewer MaxHeight="100" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <TextBlock x:Name="ValidationText" Foreground="#A13E5D" FontSize="13" MinHeight="21" LineHeight="21" FontWeight="SemiBold"
+                           TextWrapping="Wrap" Margin="3,0,8,8">
+                    <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
+                        <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed" /></Trigger>
+                    </Style.Triggers></Style></TextBlock.Style>
+                </TextBlock>
+            </ScrollViewer>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="SaveCourseButton" Content="保存课程" Style="{StaticResource CoursePrimaryButton}" Click="SaveCourse_Click" />
             <Button Content="关闭" Style="{StaticResource CourseButton}" Click="Close_Click" />
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Window>

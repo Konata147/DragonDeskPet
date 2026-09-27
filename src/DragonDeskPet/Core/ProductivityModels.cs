@@ -63,6 +63,9 @@ public sealed class TodoItem
 
 public sealed class CourseItem
 {
+    public HashSet<int> Weeks { get; set; } = [];
+    public int? StartPeriod { get; set; }
+    public int? EndPeriod { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public string ExternalId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
@@ -83,6 +86,7 @@ public sealed class CourseItem
 
 public sealed class SemesterSettings
 {
+    public SeasonalTimetable Timetable { get; set; } = SeasonalTimetable.CreateHnie();
     public string Name { get; set; } = "当前学期";
     public DateOnly StartDate { get; set; } = StartOfCurrentWeek();
 
@@ -107,7 +111,10 @@ public sealed class PomodoroState
 
 public sealed class ProductivityData
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
+    public List<CourseAdjustment> CourseAdjustments { get; set; } = [];
+    public HashSet<string> NotifiedCourseOccurrences { get; set; } = [];
+    public CourseImportSnapshot? LastCourseImport { get; set; }
     public List<ReminderItem> Reminders { get; set; } = [];
     public List<PendingAlert> PendingAlerts { get; set; } = [];
     public List<TodoItem> Todos { get; set; } = [];
@@ -125,7 +132,13 @@ public sealed record ReminderDraft(
 
 public sealed record CourseOccurrence(CourseItem Course, DateOnly Date, int TeachingWeek)
 {
-    public string OccurrenceKey => $"{Course.Id:N}:{Date:yyyy-MM-dd}";
+    public TimeOnly StartTime { get; init; } = Course.StartTime;
+    public TimeOnly EndTime { get; init; } = Course.EndTime;
+    public string Location { get; init; } = Course.Location;
+    public Guid? AdjustmentId { get; init; }
+    public bool IsMakeup { get; init; }
+    public bool IsCancelled { get; init; }
+    public string OccurrenceKey => AdjustmentId is { } id ? $"adjustment:{id:N}" : $"{Course.Id:N}:{Date:yyyy-MM-dd}";
 }
 
 public enum CourseImportDisposition

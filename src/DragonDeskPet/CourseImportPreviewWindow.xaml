@@ -46,7 +46,10 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <ContentPresenter ContentSource="Content" />
+                        <Border x:Name="Selection" BorderThickness="2" BorderBrush="Transparent" CornerRadius="12">
+                            <ContentPresenter ContentSource="Content" />
+                        </Border>
+                        <ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Selection" Property="BorderBrush" Value="#8466D3" /></Trigger></ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -79,6 +82,10 @@
             <Grid>
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <TextBlock Text="课程明细" FontSize="12" FontWeight="SemiBold" Foreground="#403653" Margin="5,2,0,9" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="编辑所选" Style="{StaticResource PreviewButton}" Padding="8,4" Click="Edit_Click" />
+                    <Button Content="排除所选" Style="{StaticResource PreviewButton}" Padding="8,4" Click="Exclude_Click" />
+                </StackPanel>
                 <ListBox x:Name="RowsList" Grid.Row="1" Background="Transparent" BorderThickness="0"
                          Padding="3" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListBox.Resources>
@@ -91,8 +98,9 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                     <StackPanel>
+                                        <TextBlock Text="{Binding Row.Course.Name}" FontSize="13" FontWeight="SemiBold" Foreground="#403653" TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding SourceDescription}" FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="#403653" TextTrimming="CharacterEllipsis"
+                                                   Foreground="#403653" TextWrapping="Wrap"
                                                    ToolTip="{Binding SourceDescription}" />
                                         <StackPanel Visibility="{Binding HasCourse, Converter={StaticResource BoolVisibility}}"
                                                     Margin="0,5,0,0">

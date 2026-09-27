@@ -336,6 +336,9 @@
                 <TabItem Header="今日">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="2,10,2,2">
+                            <Border Background="#EEE8FA" CornerRadius="12" Padding="11" Margin="0,0,0,8">
+                                <TextBlock x:Name="NextCourseText" Text="今天没有课程" TextWrapping="Wrap" Foreground="{StaticResource PanelText}" FontSize="12" />
+                            </Border>
                             <DockPanel Margin="3,0,3,5">
                                 <Button DockPanel.Dock="Right" Content="管理课表" Style="{StaticResource MiniButton}" Click="ManageCourses_Click" />
                                 <StackPanel>
@@ -393,22 +396,24 @@
                 </TabItem>
 
                 <TabItem Header="专注">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,8">
+                    <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}" /></ScrollViewer.Resources>
                     <Grid Margin="2,10,2,2">
-                        <Border Background="#F5F1FC" CornerRadius="18" Padding="18" VerticalAlignment="Top">
+                        <Border Background="#F5F1FC" CornerRadius="18" Padding="14" VerticalAlignment="Top">
                             <StackPanel HorizontalAlignment="Center">
                                 <Border Background="#E9E1F8" CornerRadius="12" Padding="12,5">
                                     <TextBlock x:Name="PomodoroPhaseText" Text="专注" FontSize="13" FontWeight="SemiBold" Foreground="#624C91" />
                                 </Border>
-                                <TextBlock x:Name="PomodoroTimeText" Text="25:00" FontSize="46" FontWeight="Light" Foreground="#55436F" Margin="0,17,0,2" />
+                                <TextBlock x:Name="PomodoroTimeText" Text="25:00" FontSize="46" FontWeight="Light" Foreground="#55436F" Margin="0,10,0,2" />
                                 <TextBlock x:Name="PomodoroRoundsText" Text="已完成 0 轮" Foreground="{StaticResource PanelMuted}" FontSize="11" />
-                                <WrapPanel x:Name="PomodoroButtons" HorizontalAlignment="Center" Margin="0,17,0,0">
+                                <WrapPanel x:Name="PomodoroButtons" HorizontalAlignment="Center" Margin="0,10,0,0">
                                     <Button x:Name="PomodoroStartButton" Content="开始专注" Style="{StaticResource PrimaryButton}" Padding="17,8" Click="PomodoroStart_Click" />
                                     <Button x:Name="PomodoroPauseButton" Content="暂停" Style="{StaticResource SoftButton}" Click="PomodoroPause_Click" Visibility="Collapsed" />
                                     <Button x:Name="PomodoroResumeButton" Content="继续" Style="{StaticResource PrimaryButton}" Click="PomodoroResume_Click" Visibility="Collapsed" />
                                     <Button x:Name="PomodoroNextButton" Content="开始下一阶段" Style="{StaticResource PrimaryButton}" Click="PomodoroNext_Click" Visibility="Collapsed" />
                                     <Button x:Name="PomodoroCancelButton" Content="取消" Style="{StaticResource SoftButton}" Click="PomodoroCancel_Click" Visibility="Collapsed" />
                                 </WrapPanel>
-                                <Border Background="White" BorderBrush="#E3DAF1" BorderThickness="1" CornerRadius="11" Padding="10,8" Margin="0,15,0,0">
+                                <Border Background="White" BorderBrush="#E3DAF1" BorderThickness="1" CornerRadius="11" Padding="10,8" Margin="0,10,0,0">
                                     <StackPanel>
                                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                             <TextBlock Text="每轮专注" VerticalAlignment="Center" Foreground="{StaticResource PanelText}" FontSize="12" />
@@ -421,10 +426,11 @@
                                                    Foreground="{StaticResource PanelMuted}" FontSize="10.5" Margin="0,5,0,0" />
                                     </StackPanel>
                                 </Border>
-                                <TextBlock Margin="0,16,0,0" Width="250" Text="每段结束后会先暂停，等你准备好再进入下一阶段。" TextWrapping="Wrap" TextAlignment="Center" Foreground="{StaticResource PanelMuted}" FontSize="11" LineHeight="18" />
+                                <TextBlock Margin="0,10,0,8" MaxWidth="250" Text="每段结束后会先暂停，&#x0a;等你准备好再进入下一阶段。" TextWrapping="Wrap" TextAlignment="Center" Foreground="{StaticResource PanelMuted}" FontSize="11" LineHeight="18" />
                             </StackPanel>
                         </Border>
                     </Grid>
+                    </ScrollViewer>
                 </TabItem>
             </TabControl>
         </Grid>

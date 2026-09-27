@@ -13,3 +13,6 @@ assets/character/candidates/
 *.user
 *.suo
 settings.local.json
+assets/ocr/*.onnx
+assets/ocr/*.download
+webview2-runtime*/

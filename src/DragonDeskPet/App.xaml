@@ -62,6 +62,30 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <ControlTemplate x:Key="CourseHorizontalScrollTemplate" TargetType="ScrollBar">
+                <Grid Height="12" Background="Transparent">
+                    <Border Height="8" Margin="3,0" Background="#F0EAF8" CornerRadius="4" />
+                    <Track x:Name="PART_Track" Orientation="Horizontal" IsDirectionReversed="False"
+                           Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                           ViewportSize="{TemplateBinding ViewportSize}"
+                           Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                        <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageLeftCommand" Style="{StaticResource CourseScrollPageButton}" /></Track.DecreaseRepeatButton>
+                        <Track.Thumb><Thumb MinWidth="27" Cursor="Hand"><Thumb.Template><ControlTemplate TargetType="Thumb">
+                            <Border Background="#B9A5DE" CornerRadius="4" Margin="0,2" />
+                        </ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+                        <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageRightCommand" Style="{StaticResource CourseScrollPageButton}" /></Track.IncreaseRepeatButton>
+                    </Track>
+                </Grid>
+        </ControlTemplate>
+        <Style x:Key="CourseAdaptiveScrollBar" TargetType="ScrollBar" BasedOn="{StaticResource CourseVerticalScrollBar}">
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="Height" Value="12" />
+                    <Setter Property="Template" Value="{StaticResource CourseHorizontalScrollTemplate}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style TargetType="Button">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Padding" Value="12,7" />
