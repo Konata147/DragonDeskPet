@@ -34,7 +34,7 @@ public sealed class SchoolImportWindow : Window
     public SchoolImportWindow(Window owner, IProductivityStore store)
     {
         _store = store;
-        Owner = owner; Title = "湖南工程学院 · 教务课表导入（待实机验证）"; Width = 1050; Height = 740;
+        Owner = owner; Title = "湖南工程学院 · 教务课表导入"; Width = 1050; Height = 740;
         MinWidth = 760; MinHeight = 500; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false; Background = owner.Background;
         _sessionRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(store.DataPath)!, "school-sessions"));

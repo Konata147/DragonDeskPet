@@ -12,9 +12,9 @@
 
 ## 当前版本
 
-当前开发分支为 **0.4.0-dev 测试版**，新增 XLS/XLSX、本地中文识图、冬夏作息、本周课表、下一节课、单次调课/补课、冲突核对与导入撤销。课表识图不需要 API Key，不上传图片。湖南工程学院教务导入需用户自行登录；当前学校页面的登录、自动返回安全入口和课表读取已通过用户实测，不承诺其他学校或页面改版后的兼容性。尚未发布 V0.4 正式版。
+当前版本为 **V0.4.0**，新增 XLS/XLSX、本地中文识图、冬夏作息、本周课表、下一节课、单次调课/补课、冲突核对与导入撤销。课表识图不需要 API Key，不上传图片。湖南工程学院教务导入需用户自行登录；当前学校页面的登录、自动返回安全入口和课表读取已通过用户实测，不承诺其他学校或页面改版后的兼容性。
 
-构建测试包前执行 `scripts/get-ocr-models.ps1`，下载并校验锁定版本的本地中文模型；发布脚本会自动完成此步骤。实际用户课表与图片不包含在仓库中。参见 [V0.4 验收记录](docs/v0.4-acceptance.md)、[发布说明草稿](docs/RELEASE_NOTES_V0.4.0.md)和[升级与回退指引](docs/UPGRADE_V0.4.md)。
+构建前执行 `scripts/get-ocr-models.ps1`，下载并校验锁定版本的本地中文模型；发布脚本会自动完成此步骤。实际用户课表与图片不包含在仓库中。参见 [V0.4 验收记录](docs/v0.4-acceptance.md)、[发布说明](docs/RELEASE_NOTES_V0.4.0.md)和[升级与回退指引](docs/UPGRADE_V0.4.md)。系统 DPI 完整矩阵及部分异常环境尚未完整实测，已在发布说明列明；重要课程请勿只依赖桌宠提醒。
 
 V0.3.0 已完成，在原有桌宠、聊天和截图体验之外加入完全本地的“校园效率助手”：今日清单、提醒、番茄钟和大学课程表。效率数据只保存在本机；不需要配置 AI 接口也能使用这些功能。
 
@@ -24,11 +24,11 @@ V0.3 暂不包含非图片文件读取、后台剪贴板监控、OCR、全局快
 
 ## 下载与运行
 
-1. 从 [DragonDeskPet V0.3.0 Release](https://github.com/Konata147/DragonDeskPet/releases/tag/v0.3.0) 下载 `DragonDeskPet-v0.3.0-win-x64.zip`。
+1. 从 [DragonDeskPet V0.4.0 Release](https://github.com/Konata147/DragonDeskPet/releases/tag/v0.4.0) 下载 `DragonDeskPet-v0.4.0-win-x64.zip`。
 2. 将 ZIP 完整解压到普通文件夹，推荐放在 D 盘等用户选择的位置。
 3. 双击 `DragonDeskPet.exe`。
 
-官方 V0.3 ZIP 已自带 .NET 运行环境，适用于 64 位 Windows 10/11，不需要另外安装 .NET。当前版本没有安装程序和数字签名，Windows 首次运行时可能显示来源确认提示。
+官方 V0.4 ZIP 已自带 .NET 运行环境及本地 OCR 模型，适用于 64 位 Windows 10/11，不需要另外安装 .NET。教务窗口需 WebView2；缺失时提供用户确认的便携下载入口。当前版本没有安装程序和数字签名，Windows 首次运行时可能显示来源确认提示。
 
 ## 操作方式
 
@@ -107,10 +107,10 @@ V0.4 的「管理课表 → 图片识图」使用随包模型在本地识别，�
 .\scripts\publish.ps1
 ```
 
-为当前开发代码生成自包含 Windows x64 测试 ZIP 和 SHA-256 校验文件（不是创建 GitHub Release）：
+为当前版本生成自包含 Windows x64 ZIP 和 SHA-256 校验文件（不是创建 GitHub Release）：
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.4.0-dev
+.\scripts\publish-release.ps1 -Version 0.4.0
 ```
 
 发布脚本默认拒绝覆盖已有的同版本文件。若目录已存在，请先核对其用途；不要对含有用户 `data` 的运行目录使用 `-Force`，该参数会删除旧输出。正式版本号、标签和 GitHub Release 另行确认，不能用旧版号为当前新功能打包。

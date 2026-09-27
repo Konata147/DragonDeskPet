@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>DragonDeskPet</AssemblyName>
     <RootNamespace>DragonDeskPet</RootNamespace>
-    <Version>0.4.0-dev</Version>
+    <Version>0.4.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>..\..\assets\icons\app.ico</ApplicationIcon>
