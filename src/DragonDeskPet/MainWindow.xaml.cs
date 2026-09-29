@@ -285,15 +285,17 @@ public partial class MainWindow : Window
         if (IsCharacterPixelHit(point))
         {
             MarkInteraction(wake: !_restingByChoice);
-            if (_restingByChoice) return;
+            if (_restingByChoice) { HidePetProps(); return; }
             if (_stateMachine.Current is PetState.Idle or PetState.Sleeping)
             {
                 _stateMachine.TransitionTo(PetState.Hover);
             }
+            ShowPetProps();
         }
         else if (_stateMachine.Current == PetState.Hover)
         {
             _stateMachine.TransitionTo(PetState.Idle);
+            SchedulePetPropsHide();
         }
     }
 
@@ -303,6 +305,8 @@ public partial class MainWindow : Window
 
     private async void CharacterHost_MouseLeave(object sender, MouseEventArgs e)
     {
+        if (_mouseDown || _dragged) HidePetProps();
+        else SchedulePetPropsHide();
         if (e.LeftButton != MouseButtonState.Pressed
             && (_dragged || _stateMachine.Current == PetState.Dragged))
         {
@@ -669,6 +673,7 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
+        HidePetProps();
         MarkInteraction(wake: false);
         if (_stateMachine.Current == PetState.Idle)
             _stateMachine.TransitionTo(PetState.Hover);
@@ -791,6 +796,7 @@ public partial class MainWindow : Window
         PetUserScaleTransform.ScaleX = scale;
         PetUserScaleTransform.ScaleY = scale;
         UpdateFloatingUiLayout(scale);
+        if (PetPropLayer.Visibility == Visibility.Visible) PositionPetProps();
         _app.Settings.Scale = scale;
         if (save)
         {
@@ -830,6 +836,7 @@ public partial class MainWindow : Window
 
     private void ShowQuickBar()
     {
+        HidePetProps();
         QuickMoreButton.IsChecked = false;
         QuickBar.Visibility = Visibility.Visible;
         QuickBar.Opacity = 1;
@@ -865,6 +872,7 @@ public partial class MainWindow : Window
 
     private void ApplyStateVisual(PetState state)
     {
+        if (state is not (PetState.Idle or PetState.Hover)) HidePetProps();
         if (state is not (PetState.Idle or PetState.Hover)) CancelLongPress();
         _animationPlayer.Stop();
         _strokeRecognizer.Reset();
@@ -910,6 +918,7 @@ public partial class MainWindow : Window
 
     private void ToggleChat()
     {
+        HidePetProps();
         ProductivityPanel.Visibility = Visibility.Collapsed;
         ChatBubble.Visibility = ChatBubble.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
         HideQuickBar();
@@ -923,6 +932,7 @@ public partial class MainWindow : Window
 
     public void OpenProductivity()
     {
+        HidePetProps();
         MarkInteraction();
         _hiddenByUser = false;
         if (!IsVisible)
@@ -1305,6 +1315,7 @@ public partial class MainWindow : Window
         {
             Owner = this
         };
+        HidePetProps();
         _settingsOpen = true;
         try { window.ShowDialog(); }
         finally { _settingsOpen = false; }
@@ -1396,6 +1407,7 @@ public partial class MainWindow : Window
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
+        HidePetProps();
         CancelPressGesture(suppressRelease: true);
         HideQuickBar();
         CancelTreat();
@@ -1580,6 +1592,7 @@ public partial class MainWindow : Window
         if (AllowClose)
         {
             _closing = true;
+            HidePetProps();
             CancelPressGesture(suppressRelease: true);
             CancelTreat();
             _animationPlayer.Dispose();

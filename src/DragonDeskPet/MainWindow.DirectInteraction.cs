@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using DragonDeskPet.Core;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -14,6 +15,74 @@ public partial class MainWindow
     private NativePoint? _lastStrokeCursor;
     private bool _feeding;
     private bool _draggingTreat;
+    private readonly DispatcherTimer _propHideTimer = new() { Interval = TimeSpan.FromMilliseconds(350) };
+
+    private bool CanShowPetProps => IsVisible && !_closing && !_isFullscreenActive && !_settingsOpen
+        && !_isBusy && !_feeding && !_mouseDown && !_dragged && _activePetActivity is null
+        && _stateMachine.Current is PetState.Idle or PetState.Hover
+        && QuickBar.Visibility != Visibility.Visible && ChatBubble.Visibility != Visibility.Visible
+        && ProductivityPanel.Visibility != Visibility.Visible && ReminderAlertCard.Visibility != Visibility.Visible
+        && OnboardingBubble.Visibility != Visibility.Visible
+        && !((ContextMenu)FindResource("PetMenu")).IsOpen
+        && !((ContextMenu)FindResource("InteractionMenu")).IsOpen;
+
+    private void PositionPetProps()
+    {
+        if (CharacterHost.RenderSize.Width <= 0 || RootSurface.ActualWidth <= 0 || RootSurface.ActualHeight <= 0) return;
+        var bounds = CharacterHost.TransformToAncestor(RootSurface)
+            .TransformBounds(new Rect(new Point(0, 0), CharacterHost.RenderSize));
+        Canvas.SetLeft(PetPropBar, Math.Clamp(bounds.Left - 28, 4, Math.Max(4, RootSurface.ActualWidth - 42)));
+        Canvas.SetTop(PetPropBar, Math.Clamp(bounds.Top + bounds.Height * .45 - 39,
+            4, Math.Max(4, RootSurface.ActualHeight - 82)));
+    }
+
+    private void ShowPetProps()
+    {
+        if (!CanShowPetProps) { HidePetProps(); return; }
+        _propHideTimer.Stop();
+        PositionPetProps();
+        PetPropLayer.Visibility = Visibility.Visible;
+    }
+
+    private void SchedulePetPropsHide()
+    {
+        if (PetPropLayer.Visibility == Visibility.Visible && !_propHideTimer.IsEnabled)
+            _propHideTimer.Start();
+    }
+
+    private void HidePetProps()
+    {
+        _propHideTimer.Stop();
+        PetPropLayer.Visibility = Visibility.Collapsed;
+    }
+
+    private void PetPropBar_MouseEnter(object sender, MouseEventArgs e) => _propHideTimer.Stop();
+
+    private void PetPropBar_MouseLeave(object sender, MouseEventArgs e) => SchedulePetPropsHide();
+
+    private void PetPropSnack_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (!CanShowPetProps) { HidePetProps(); return; }
+        HidePetProps();
+        ShowTreat();
+        if (!_feeding) return;
+        SetTreatPosition(e.GetPosition(TreatLayer));
+        _draggingTreat = TreatToken.CaptureMouse();
+        if (!_draggingTreat)
+        {
+            CancelTreat();
+            ApplyStateVisual(_stateMachine.Current);
+        }
+    }
+
+    private void PetPropDance_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (!CanShowPetProps) { HidePetProps(); return; }
+        HidePetProps();
+        PlayPetActivity(PetActivity.Dance);
+    }
 
     private bool TryGetArtworkRect(out Rect rect)
     {
@@ -51,6 +120,7 @@ public partial class MainWindow
     private void ShowTreat()
     {
         if (!PetCanInteract) return;
+        HidePetProps();
         HideQuickBar();
         _animationPlayer.Stop();
         if (_stateMachine.Current == PetState.Sleeping) _restingByChoice = false;

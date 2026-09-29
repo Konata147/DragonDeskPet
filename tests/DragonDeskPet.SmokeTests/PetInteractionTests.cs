@@ -583,6 +583,21 @@ internal static class PetInteractionTests
             && ((Canvas)window.FindName("TreatLayer")).Visibility == Visibility.Collapsed,
             "Cancelled feeding still leaves the treat visible or active.");
         var root = (Grid)window.Content;
+        var propLayer = (Canvas)window.FindName("PetPropLayer");
+        var propBar = (StackPanel)window.FindName("PetPropBar");
+        var propSnack = (System.Windows.Controls.Button)window.FindName("PetPropSnack");
+        var propDance = (System.Windows.Controls.Button)window.FindName("PetPropDance");
+        Require(propLayer.Visibility == Visibility.Collapsed
+            && propSnack.Width == 34 && propDance.Width == 34
+            && propSnack.ToolTip?.ToString()?.Contains("投喂") == true
+            && propDance.ToolTip?.ToString()?.Contains("舞") == true,
+            $"The direct props are not initially hidden or labelled: {propLayer.Visibility}, "
+                + $"snack={propSnack.ToolTip}, dance={propDance.ToolTip}.");
+        propLayer.Visibility = Visibility.Visible;
+        Invoke(window, "ToggleChat");
+        Require(propLayer.Visibility == Visibility.Collapsed,
+            "Direct props stayed visible behind the chat bubble.");
+        Invoke(window, "ToggleChat");
         root.Background = new SolidColorBrush(Color.FromRgb(239, 234, 248));
         var menu = (ContextMenu)window.FindResource("InteractionMenu");
         menu.ApplyTemplate();
@@ -606,6 +621,26 @@ internal static class PetInteractionTests
             Invoke(window, "ApplyStateVisual", PetState.Idle);
             root.Measure(new System.Windows.Size(830, 590));
             root.Arrange(new Rect(0, 0, 830, 590)); root.UpdateLayout();
+            propLayer.Visibility = Visibility.Visible;
+            Invoke(window, "PositionPetProps");
+            root.UpdateLayout();
+            var propBounds = propBar.TransformToAncestor(root).TransformBounds(new Rect(propBar.RenderSize));
+            var cloudBounds = companionHitArea.TransformToAncestor(root)
+                .TransformBounds(new Rect(companionHitArea.RenderSize));
+            Require(propBounds.Left >= 0 && propBounds.Top >= 0
+                && propBounds.Right <= 830 && propBounds.Bottom <= 590
+                && !propBounds.IntersectsWith(cloudBounds),
+                $"The snack/dance props are clipped or cover the small AI at {scaleValue:P0}.");
+            foreach (var prop in new[] { propSnack, propDance })
+            {
+                var bounds = prop.TransformToAncestor(root).TransformBounds(new Rect(prop.RenderSize));
+                var hit = VisualTreeHelper.HitTest(root,
+                    new System.Windows.Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2))?.VisualHit;
+                while (hit is not null && !ReferenceEquals(hit, prop)) hit = VisualTreeHelper.GetParent(hit);
+                Require(ReferenceEquals(hit, prop),
+                    $"The {prop.Name} hit target is covered at {scaleValue:P0}.");
+            }
+            Save(root, 830, 590, Path.Combine(directory, $"direct-props-scale-{scaleValue:0.0}.png"));
             var hitBounds = companionHitArea.TransformToAncestor(root)
                 .TransformBounds(new Rect(companionHitArea.RenderSize));
             Require(companionHitArea.Visibility == Visibility.Visible
@@ -619,6 +654,8 @@ internal static class PetInteractionTests
                     hitBounds.Top + hitBounds.Height / 2))?.VisualHit, companionHitArea),
                 $"The cloud hit target is covered at {scaleValue:P0}.");
             Invoke(window, "ApplyStateVisual", PetState.Dragged);
+            Require(propLayer.Visibility == Visibility.Collapsed,
+                "Direct props stayed visible during a pet action.");
             Save(root, 830, 590, Path.Combine(directory, $"dragged-scale-{scaleValue:0.0}.png"));
             typeof(MainWindow).GetField("_preserveCharacterImageForAction", BindingFlags.NonPublic | BindingFlags.Instance)!
                 .SetValue(window, true);

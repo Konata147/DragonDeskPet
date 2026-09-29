@@ -194,7 +194,7 @@
         </ContextMenu>
     </Window.Resources>
 
-    <Grid>
+    <Grid x:Name="RootSurface">
         <local:ProductivityBubble x:Name="ProductivityPanel"
                                   xmlns:local="clr-namespace:DragonDeskPet"
                                   Panel.ZIndex="6"
@@ -435,6 +435,31 @@
                 </Border>
             </Popup>
         </Grid>
+
+        <Canvas x:Name="PetPropLayer" Panel.ZIndex="11" Visibility="Collapsed">
+          <StackPanel x:Name="PetPropBar" Orientation="Vertical"
+                      Width="38" Height="78" MouseEnter="PetPropBar_MouseEnter"
+                      MouseLeave="PetPropBar_MouseLeave">
+            <Button x:Name="PetPropSnack" Width="34" Height="34" Margin="2,0,2,6"
+                    Padding="0" Cursor="Hand" ToolTip="拖到嘴边投喂"
+                    Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+                    PreviewMouseLeftButtonDown="PetPropSnack_PreviewMouseLeftButtonDown">
+                <Grid Width="21" Height="21">
+                    <Ellipse Fill="#E5BA7B" Stroke="#A57744" StrokeThickness="1.4" />
+                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="-7,-6,0,0" />
+                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="6,-1,0,0" />
+                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="-2,7,0,0" />
+                </Grid>
+            </Button>
+            <Button x:Name="PetPropDance" Width="34" Height="34" Margin="2,0,2,0"
+                    Padding="0" Cursor="Hand" ToolTip="点一下，跳支舞"
+                    Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+                    Click="PetPropDance_Click">
+                <TextBlock Text="♫" Foreground="#7555A4" FontSize="23"
+                           FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+            </Button>
+          </StackPanel>
+        </Canvas>
 
         <Canvas x:Name="TreatLayer" Panel.ZIndex="12" Visibility="Collapsed">
             <Ellipse x:Name="TreatTarget" Width="40" Height="40" Stroke="#AA9B75C4" StrokeThickness="1.5"

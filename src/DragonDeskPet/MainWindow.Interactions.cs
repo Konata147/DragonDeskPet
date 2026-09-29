@@ -83,6 +83,11 @@ public partial class MainWindow
     private void InitializePetInteractions()
     {
         _longPressTimer.Tick += LongPressTimer_Tick;
+        _propHideTimer.Tick += (_, _) =>
+        {
+            _propHideTimer.Stop();
+            if (!CharacterHost.IsMouseOver && !PetPropBar.IsMouseOver) HidePetProps();
+        };
         _petAnimator = new PetAnimator(PetStateScaleTransform, PetRotateTransform,
             PetTranslateTransform, PetAccentText);
         _companionAnimator = new PetCompanionAnimator(AiCompanion, AiCompanionScale,
@@ -99,6 +104,7 @@ public partial class MainWindow
             if (!_loaded) return;
             if (!IsVisible)
             {
+                HidePetProps();
                 CancelPressGesture(suppressRelease: true);
                 CancelTreat();
                 _strokeRecognizer.Reset();
@@ -128,6 +134,7 @@ public partial class MainWindow
 
     private void InteractMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        HidePetProps();
         HideQuickBar();
         var menu = (ContextMenu)FindResource("InteractionMenu");
         menu.PlacementTarget = CharacterHost;
