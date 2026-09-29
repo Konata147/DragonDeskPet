@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using DragonDeskPet.Core;
 using DragonDeskPet.Services;
 
@@ -23,13 +24,65 @@ public partial class MainWindow
     private readonly PetAnimationPlayer _animationPlayer = new();
     private PetCompanionAnimator _companionAnimator = null!;
     private DateTimeOffset _nextBlink = DateTimeOffset.UtcNow.AddSeconds(6);
+    private readonly PetHoldRecognizer _holdRecognizer = new();
+    private readonly DispatcherTimer _longPressTimer = new() { Interval = TimeSpan.FromMilliseconds(PetHoldRecognizer.DelayMilliseconds) };
+    private bool _cloudPress;
+    private bool _longPressConsumed;
+    private bool _suppressPressRelease;
+    private readonly PetTapCooldown _companionTapCooldown = new();
 
     private bool IsFocusing => _app.PomodoroService is { State: { IsRunning: true, Phase: PomodoroPhase.Focus } };
     private bool PetCanInteract => PetActivities.CanStart(_stateMachine.Current,
         _isBusy, _mouseDown || _dragged, IsVisible && !_isFullscreenActive && !_closing);
+    private bool CanHoldToCuddle => IsVisible && !_isFullscreenActive && !_closing && !_settingsOpen
+        && !_isBusy && !_feeding
+        && _stateMachine.Current is PetState.Idle or PetState.Hover;
+
+    private bool WithinDragThreshold()
+    {
+        var point = System.Windows.Input.Mouse.GetPosition(this);
+        return Math.Abs(point.X - _mouseDownPoint.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(point.Y - _mouseDownPoint.Y) < SystemParameters.MinimumVerticalDragDistance;
+    }
+
+    private void CancelLongPress()
+    {
+        _longPressTimer.Stop();
+        _holdRecognizer.Cancel();
+    }
+
+    private void CancelPressGesture(bool suppressRelease = false)
+    {
+        CancelLongPress();
+        if (suppressRelease && _mouseDown) _suppressPressRelease = true;
+        _cloudPress = false;
+        if (suppressRelease)
+        {
+            _mouseDown = false;
+            if (System.Windows.Input.Mouse.Captured == CharacterHost)
+                CharacterHost.ReleaseMouseCapture();
+        }
+    }
+
+    private void LongPressTimer_Tick(object? sender, EventArgs e)
+    {
+        var fire = _holdRecognizer.TryTrigger(Environment.TickCount64,
+            System.Windows.Input.Mouse.LeftButton == System.Windows.Input.MouseButtonState.Pressed,
+            _mouseDown && !_dragged && WithinDragThreshold() && System.Windows.Input.Mouse.Captured == CharacterHost,
+            CanHoldToCuddle);
+        _longPressTimer.Stop();
+        if (!fire) return;
+        _longPressConsumed = true;
+        _mouseDown = false;
+        _cloudPress = false;
+        CharacterHost.ReleaseMouseCapture();
+        HideQuickBar();
+        PlayPetActivity(PetActivity.Cuddle);
+    }
 
     private void InitializePetInteractions()
     {
+        _longPressTimer.Tick += LongPressTimer_Tick;
         _petAnimator = new PetAnimator(PetStateScaleTransform, PetRotateTransform,
             PetTranslateTransform, PetAccentText);
         _companionAnimator = new PetCompanionAnimator(AiCompanion, AiCompanionScale,
@@ -46,6 +99,7 @@ public partial class MainWindow
             if (!_loaded) return;
             if (!IsVisible)
             {
+                CancelPressGesture(suppressRelease: true);
                 CancelTreat();
                 _strokeRecognizer.Reset();
                 _animationPlayer.Stop();

@@ -318,8 +318,10 @@ public partial class MainWindow : Window
 
     private async void CharacterHost_LostMouseCapture(object sender, MouseEventArgs e)
     {
+        CancelLongPress();
         if (e.LeftButton == MouseButtonState.Pressed)
         {
+            if (!_longPressConsumed) _suppressPressRelease = true;
             return;
         }
 
@@ -339,11 +341,18 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!IsCharacterPixelHit(e.GetPosition(CharacterImage)))
+        var cloudHit = AiCompanionHitArea.Visibility == Visibility.Visible
+            && ReferenceEquals(e.OriginalSource, AiCompanionHitArea);
+        if (!cloudHit && !IsCharacterPixelHit(e.GetPosition(CharacterImage)))
         {
             return;
         }
 
+        var canHold = !cloudHit && e.ClickCount == 1 && CanHoldToCuddle;
+        CancelLongPress();
+        _longPressConsumed = false;
+        _suppressPressRelease = false;
+        _cloudPress = cloudHit;
         _wakeOnClick = _stateMachine.Current == PetState.Sleeping;
         MarkInteraction();
         if (!GetCursorPos(out _dragStartCursor)
@@ -359,9 +368,12 @@ public partial class MainWindow : Window
         if (!CharacterHost.CaptureMouse())
         {
             _mouseDown = false;
+            _cloudPress = false;
             return;
         }
 
+        _holdRecognizer.Begin(Environment.TickCount64, canHold);
+        if (_holdRecognizer.IsArmed) _longPressTimer.Start();
         e.Handled = true;
     }
 
@@ -407,6 +419,7 @@ public partial class MainWindow : Window
 
         if (e.LeftButton != MouseButtonState.Pressed)
         {
+            CancelLongPress();
             if (_dragged)
             {
                 await CompleteDragAsync();
@@ -421,13 +434,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var point = e.GetPosition(this);
-        if (Math.Abs(point.X - _mouseDownPoint.X) < SystemParameters.MinimumHorizontalDragDistance
-            && Math.Abs(point.Y - _mouseDownPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+        if (WithinDragThreshold())
         {
             return;
         }
 
+        CancelLongPress();
+        _cloudPress = false;
         _dragged = true;
         _stateMachine.TransitionTo(PetState.Dragged);
         _dragTimer.Start();
@@ -533,6 +546,15 @@ public partial class MainWindow : Window
 
     private async void CharacterHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        CancelLongPress();
+        if (_longPressConsumed || _suppressPressRelease)
+        {
+            _longPressConsumed = false;
+            _suppressPressRelease = false;
+            _cloudPress = false;
+            e.Handled = true;
+            return;
+        }
         if (!_mouseDown && !_dragged)
         {
             e.Handled = true;
@@ -548,8 +570,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        CharacterHost.ReleaseMouseCapture();
         _mouseDown = false;
+        var cloudPress = _cloudPress;
+        _cloudPress = false;
+        CharacterHost.ReleaseMouseCapture();
+        e.Handled = true;
+
+        if (cloudPress)
+        {
+            if (_stateMachine.Current is PetState.Idle or PetState.Hover
+                && !_isBusy && !_feeding
+                && _companionTapCooldown.TryAccept(DateTimeOffset.UtcNow))
+            {
+                _companionAnimator.Tap();
+            }
+            return;
+        }
 
         if (_mouseDownClickCount >= 2)
         {
@@ -564,6 +600,8 @@ public partial class MainWindow : Window
 
     private Task CompleteDragAsync()
     {
+        CancelLongPress();
+        _cloudPress = false;
         var wasDragging = _dragged || _stateMachine.Current == PetState.Dragged;
         if (wasDragging)
         {
@@ -827,6 +865,7 @@ public partial class MainWindow : Window
 
     private void ApplyStateVisual(PetState state)
     {
+        if (state is not (PetState.Idle or PetState.Hover)) CancelLongPress();
         _animationPlayer.Stop();
         _strokeRecognizer.Reset();
         if (state is not (PetState.Idle or PetState.Hover)) CancelTreat();
@@ -1355,7 +1394,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Window_Deactivated(object? sender, EventArgs e) { HideQuickBar(); CancelTreat(); }
+    private void Window_Deactivated(object? sender, EventArgs e)
+    {
+        CancelPressGesture(suppressRelease: true);
+        HideQuickBar();
+        CancelTreat();
+    }
 
     private void ProductivityTimer_Tick(object? sender, EventArgs e)
     {
@@ -1536,6 +1580,7 @@ public partial class MainWindow : Window
         if (AllowClose)
         {
             _closing = true;
+            CancelPressGesture(suppressRelease: true);
             CancelTreat();
             _animationPlayer.Dispose();
             _petAnimator.Stop();

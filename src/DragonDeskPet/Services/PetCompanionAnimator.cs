@@ -24,6 +24,8 @@ public sealed class PetCompanionAnimator(
     {
         Interval = TimeSpan.FromMilliseconds(170)
     };
+    private DispatcherTimer? _tapTimer;
+    private long _revision;
     private PetState _state = PetState.Idle;
     private bool _reducedMotion;
     private DateTimeOffset _nextAmbient = DateTimeOffset.UtcNow.AddSeconds(8);
@@ -125,9 +127,36 @@ public sealed class PetCompanionAnimator(
         }
     }
 
+    public void Tap()
+    {
+        if (image.Visibility != Visibility.Visible || _state is not (PetState.Idle or PetState.Hover)) return;
+        StopMotion();
+        var revision = _revision;
+        SetFace(Mood.Happy);
+        if (!_reducedMotion)
+            Animate(translate, TranslateTransform.YProperty,
+                (0, 0), (240, -3), (700, 0));
+        var timer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromMilliseconds(700)
+        };
+        timer.Tick += (_, _) => EndTap(timer, revision);
+        _tapTimer = timer;
+        timer.Start();
+    }
+
+    private void EndTap(DispatcherTimer timer, long revision)
+    {
+        timer.Stop();
+        if (!ReferenceEquals(_tapTimer, timer) || _revision != revision) return;
+        StopMotion();
+        if (image.Visibility == Visibility.Visible && _state is PetState.Idle or PetState.Hover)
+            SetFace(_state == PetState.Hover ? Mood.Curious : Mood.Normal);
+    }
+
     public void Tick(DateTimeOffset now, bool focusing)
     {
-        if (_reducedMotion || image.Visibility != Visibility.Visible
+        if (_tapTimer?.IsEnabled == true || _reducedMotion || image.Visibility != Visibility.Visible
             || _state is not (PetState.Idle or PetState.Hover)
             || now < _nextAmbient) return;
         _nextAmbient = now.AddSeconds(focusing ? Random.Shared.Next(13, 19)
@@ -185,13 +214,17 @@ public sealed class PetCompanionAnimator(
     private void EndBlink(object? sender, EventArgs e)
     {
         _blinkTimer.Stop();
+        if (_tapTimer?.IsEnabled == true) return;
         if (_state is (PetState.Idle or PetState.Hover) && image.Visibility == Visibility.Visible)
             SetFace(_state == PetState.Hover ? Mood.Curious : Mood.Normal);
     }
 
     private void StopMotion()
     {
+        _revision++;
         _blinkTimer.Stop();
+        _tapTimer?.Stop();
+        _tapTimer = null;
         scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         scale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
         rotate.BeginAnimation(RotateTransform.AngleProperty, null);

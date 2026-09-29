@@ -21,6 +21,7 @@ internal static class PetInteractionTests
         CheckTreatDrop();
         CheckClipTiming();
         CheckPlayerLifecycle();
+        CheckDirectPressGestures();
     }
 
     public static int Run(string directory)
@@ -211,6 +212,40 @@ internal static class PetInteractionTests
         Console.WriteLine("PASS: player stops at the final frame, ignores interrupted callbacks and shows one static poster.");
     }
 
+    private static void CheckDirectPressGestures()
+    {
+        var hold = new PetHoldRecognizer();
+        hold.Begin(1000, true);
+        Require(!hold.TryTrigger(1549, true, true, true) && hold.IsArmed,
+            "A short click was mistaken for a cuddle.");
+        Require(hold.TryTrigger(1550, true, true, true)
+            && !hold.TryTrigger(2000, true, true, true),
+            "Long press did not trigger once at 550 ms.");
+        hold.Begin(3000, true);
+        Require(!hold.TryTrigger(3550, true, false, true) && !hold.IsArmed,
+            "A drag kept the long-press timer armed.");
+        hold.Begin(4000, false);
+        Require(!hold.TryTrigger(4600, true, true, true),
+            "Double-click or ineligible state armed a cuddle.");
+        foreach (var cancelled in new[] { (false, true), (true, false) })
+        {
+            hold.Begin(5000, true);
+            Require(!hold.TryTrigger(5600, cancelled.Item1, true, cancelled.Item2),
+                "Release or interrupted state triggered a cuddle.");
+        }
+        hold.Begin(6000, true);
+        hold.Cancel();
+        Require(!hold.TryTrigger(6600, true, true, true),
+            "A cancelled hold triggered after deactivation or hiding.");
+
+        var taps = new PetTapCooldown();
+        var now = DateTimeOffset.UnixEpoch;
+        Require(taps.TryAccept(now) && !taps.TryAccept(now.AddMilliseconds(699))
+            && taps.TryAccept(now.AddMilliseconds(700)),
+            "Cloud tap cooldown allowed overlapping responses or blocked the next response.");
+        Console.WriteLine("PASS: 550 ms one-shot cuddle, drag/double-click cancellation and cloud tap cooldown.");
+    }
+
     private static void CheckArtwork()
     {
         var library = new PetAnimationLibrary(Path.Combine(AppContext.BaseDirectory, "assets", "character", "animations"));
@@ -394,6 +429,7 @@ internal static class PetInteractionTests
         Invoke(window, "LoadCharacterAssets");
         var characterImage = (WpfImage)window.FindName("CharacterImage");
         var companion = (WpfImage)window.FindName("AiCompanion");
+        var companionHitArea = (Border)window.FindName("AiCompanionHitArea");
         // Measure the cloud body in dragged.png (about x=925..1045, y=375..473).
         // The state image fits the 168-wide host; match both size and center.
         var stateScale = 168d / 1241d;
@@ -407,6 +443,13 @@ internal static class PetInteractionTests
             && Math.Abs(companion.Margin.Top + companion.Height / 2 - referenceCenterY) < 3,
             "The independent small AI no longer matches the cloud in the dragged state.");
         Require(companion.Source is not null, "The small AI companion was lost from animation poses.");
+        Require(companionHitArea.Width == 28 && companionHitArea.Height == 26
+            && companion.Width == 18 && companion.Height == 15
+            && Math.Abs((168 - companionHitArea.Margin.Right - companionHitArea.Width / 2)
+                - (168 - companion.Margin.Right - companion.Width / 2)) < 1
+            && Math.Abs(companionHitArea.Margin.Top + companionHitArea.Height / 2
+                - companion.Margin.Top - companion.Height / 2) < 1,
+            "The transparent cloud hit target changed the sprite size or missed its center.");
         var normalCompanion = companion.Source;
         Invoke(window, "ApplyStateVisual", PetState.Hover);
         Require(companion.Visibility == Visibility.Visible, "The companion is hidden on hover.");
@@ -441,6 +484,56 @@ internal static class PetInteractionTests
             && !((ScaleTransform)window.FindName("AiCompanionScale")).HasAnimatedProperties
             && !ReferenceEquals(companion.Source, normalCompanion),
             "Reduced motion did not keep a static but expressive companion.");
+        companionAnimator.SetState(PetState.Idle, false, false);
+        companionAnimator.Tap();
+        var tapTimer = (DispatcherTimer)typeof(PetCompanionAnimator)
+            .GetField("_tapTimer", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        Require(tapTimer.IsEnabled && tapTimer.Interval == TimeSpan.FromMilliseconds(700)
+            && companionMotion.HasAnimatedProperties && !ReferenceEquals(companion.Source, normalCompanion)
+            && !((TranslateTransform)window.FindName("PetTranslateTransform")).HasAnimatedProperties,
+            "Cloud tap did not respond independently for 700 ms.");
+        var tapFace = companion.Source;
+        typeof(PetCompanionAnimator).GetMethod("EndBlink", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(companionAnimator, [null, EventArgs.Empty]);
+        Require(ReferenceEquals(companion.Source, tapFace),
+            "An old blink callback replaced the cloud tap expression.");
+        companionAnimator.SetState(PetState.Sleeping, false, false);
+        Require(!tapTimer.IsEnabled && companion.Visibility == Visibility.Collapsed
+            && companionHitArea.Visibility == Visibility.Collapsed,
+            "The cloud tap continued after sleep.");
+        companionAnimator.SetState(PetState.Idle, true, false);
+        companionAnimator.Tap();
+        var staticTapTimer = (DispatcherTimer)typeof(PetCompanionAnimator)
+            .GetField("_tapTimer", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        Require(staticTapTimer.IsEnabled && !companionMotion.HasAnimatedProperties
+            && !ReferenceEquals(companion.Source, normalCompanion),
+            "Reduced motion did not use a static cloud tap expression.");
+        companionAnimator.React(PetActivity.Greet);
+        Require(!staticTapTimer.IsEnabled,
+            "A new pet interaction did not cancel the old cloud response.");
+        companionAnimator.Suspend();
+        Require(companion.Visibility == Visibility.Collapsed,
+            "The cloud stayed visible after hiding.");
+        companionAnimator.SetState(PetState.Idle, false, false);
+        companionAnimator.Tap();
+        var olderTap = (DispatcherTimer)typeof(PetCompanionAnimator)
+            .GetField("_tapTimer", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        var olderRevision = (long)typeof(PetCompanionAnimator)
+            .GetField("_revision", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        companionAnimator.Tap();
+        var currentTap = (DispatcherTimer)typeof(PetCompanionAnimator)
+            .GetField("_tapTimer", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        var currentRevision = (long)typeof(PetCompanionAnimator)
+            .GetField("_revision", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(companionAnimator)!;
+        typeof(PetCompanionAnimator).GetMethod("EndTap", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(companionAnimator, [olderTap, olderRevision]);
+        Require(currentTap.IsEnabled && !ReferenceEquals(companion.Source, normalCompanion),
+            "The older cloud response ended a newer tap early.");
+        typeof(PetCompanionAnimator).GetMethod("EndTap", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(companionAnimator, [currentTap, currentRevision]);
+        Require(ReferenceEquals(companion.Source, normalCompanion)
+            && !companionMotion.HasAnimatedProperties,
+            "The cloud did not return to its calm face after the response.");
         Require(!CopyPixels((BitmapSource)characterImage.Source).AsSpan()
                 .SequenceEqual(CopyPixels(new PetAnimationLibrary(Path.Combine(AppContext.BaseDirectory,
                     "assets", "character", "animations")).Load("Greet")!.Frames[0])),
@@ -510,6 +603,21 @@ internal static class PetInteractionTests
         foreach (var scaleValue in new[] { .6, 1, 2 })
         {
             Invoke(window, "ApplyScale", scaleValue, false);
+            Invoke(window, "ApplyStateVisual", PetState.Idle);
+            root.Measure(new System.Windows.Size(830, 590));
+            root.Arrange(new Rect(0, 0, 830, 590)); root.UpdateLayout();
+            var hitBounds = companionHitArea.TransformToAncestor(root)
+                .TransformBounds(new Rect(companionHitArea.RenderSize));
+            Require(companionHitArea.Visibility == Visibility.Visible
+                && Math.Abs(hitBounds.Width - 28 * scaleValue) < 1
+                && Math.Abs(hitBounds.Height - 26 * scaleValue) < 1
+                && hitBounds.Left >= 0 && hitBounds.Top >= 0
+                && hitBounds.Right <= 830 && hitBounds.Bottom <= 590,
+                $"The cloud hit target is missing, off-center or clipped at {scaleValue:P0}.");
+            Require(ReferenceEquals(VisualTreeHelper.HitTest(root,
+                new System.Windows.Point(hitBounds.Left + hitBounds.Width / 2,
+                    hitBounds.Top + hitBounds.Height / 2))?.VisualHit, companionHitArea),
+                $"The cloud hit target is covered at {scaleValue:P0}.");
             Invoke(window, "ApplyStateVisual", PetState.Dragged);
             Save(root, 830, 590, Path.Combine(directory, $"dragged-scale-{scaleValue:0.0}.png"));
             typeof(MainWindow).GetField("_preserveCharacterImageForAction", BindingFlags.NonPublic | BindingFlags.Instance)!

@@ -499,6 +499,12 @@
                 </Image.RenderTransform>
             </Image>
 
+            <Border x:Name="AiCompanionHitArea" Width="28" Height="26"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,69,21,0" Background="Transparent"
+                    Panel.ZIndex="3" Cursor="Hand"
+                    Visibility="{Binding Visibility, ElementName=AiCompanion}" />
+
             <Viewbox x:Name="PlaceholderCharacter" Stretch="Uniform">
                 <Canvas Width="160" Height="210">
                     <Path Fill="#C9B6F2" Stroke="#8168B2" StrokeThickness="2"
