@@ -11,6 +11,7 @@
         WindowStartupLocation="Manual"
         SnapsToDevicePixels="True"
         Deactivated="Window_Deactivated"
+        PreviewKeyDown="Interaction_PreviewKeyDown"
         Closing="Window_Closing"
         LocationChanged="Window_LocationChanged">
     <Window.Resources>
@@ -167,6 +168,7 @@
                      ItemContainerStyle="{StaticResource PetMenuItemStyle}"
                      Closed="PetMenu_Closed">
             <MenuItem Header="💬 和我聊天" Click="ChatMenuItem_Click" />
+            <MenuItem Header="♡ 陪我玩" Click="InteractMenuItem_Click" />
             <MenuItem Header="📷 截图问我" Tag="Screenshot" Click="ScreenshotMenuItem_Click" />
             <MenuItem Header="📋 剪贴板问我" Tag="Clipboard" Click="ClipboardMenuItem_Click" />
             <MenuItem Header="⏱ 效率助手" Click="ProductivityMenuItem_Click" />
@@ -176,6 +178,19 @@
             <MenuItem Header="🙈 隐藏" Click="HideMenuItem_Click" />
             <Separator Style="{StaticResource PetMenuSeparatorStyle}" />
             <MenuItem Header="退出" Click="ExitMenuItem_Click" />
+        </ContextMenu>
+        <ContextMenu x:Key="InteractionMenu" Style="{StaticResource PetContextMenuStyle}"
+                     ItemContainerStyle="{StaticResource PetMenuItemStyle}"
+                     Opened="InteractionMenu_Opened" Closed="PetMenu_Closed">
+            <MenuItem Header="✦  打招呼" Tag="Greet" Click="PetActivity_Click" />
+            <MenuItem Header="♡  摸摸头" Tag="Pet" Click="PetActivity_Click" />
+            <MenuItem Header="♪  喂点心" Tag="Feed" Click="PetActivity_Click" />
+            <MenuItem Header="♡  贴贴" Tag="Cuddle" Click="PetActivity_Click" />
+            <MenuItem Header="✧  蹦一蹦" Tag="Hop" Click="PetActivity_Click" />
+            <MenuItem Header="♫  晃晃舞" Tag="Dance" Click="PetActivity_Click" />
+            <MenuItem Header="✧  伸个懒腰" Tag="Stretch" Click="PetActivity_Click" />
+            <Separator Style="{StaticResource PetMenuSeparatorStyle}" />
+            <MenuItem Header="☾  打个盹" Tag="Rest" Click="PetActivity_Click" />
         </ContextMenu>
     </Window.Resources>
 
@@ -404,6 +419,8 @@
                         <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.22" Color="#57446F" />
                     </Border.Effect>
                     <StackPanel>
+                        <Button Style="{StaticResource QuickMoreItemStyle}"
+                                Content="♡  陪我玩" Click="InteractMenuItem_Click" />
                         <Button x:Name="QuickTopmostButton"
                                 Style="{StaticResource QuickMoreItemStyle}"
                                 Content="✓  始终置顶"
@@ -419,6 +436,20 @@
             </Popup>
         </Grid>
 
+        <Canvas x:Name="TreatLayer" Panel.ZIndex="12" Visibility="Collapsed">
+            <Ellipse x:Name="TreatTarget" Width="40" Height="40" Stroke="#AA9B75C4" StrokeThickness="1.5"
+                     StrokeDashArray="2 3" IsHitTestVisible="False" />
+            <Border x:Name="TreatToken" Width="36" Height="36" CornerRadius="18" Background="#E5BA7B"
+                    BorderBrush="#A57744" BorderThickness="2" Cursor="Hand" Focusable="True"
+                    ToolTip="拖到嘴边投喂 · Esc 取消" MouseLeftButtonDown="Treat_MouseDown"
+                    MouseMove="Treat_MouseMove" MouseLeftButtonUp="Treat_MouseUp" LostMouseCapture="Treat_LostCapture">
+                <Canvas IsHitTestVisible="False">
+                    <Ellipse Canvas.Left="8" Canvas.Top="6" Width="5" Height="5" Fill="#845C3C" />
+                    <Ellipse Canvas.Left="20" Canvas.Top="10" Width="4" Height="4" Fill="#845C3C" />
+                    <Ellipse Canvas.Left="12" Canvas.Top="20" Width="5" Height="5" Fill="#845C3C" />
+                </Canvas>
+            </Border>
+        </Canvas>
         <Grid x:Name="CharacterHost"
               Width="168" Height="220"
               AllowDrop="True"
@@ -453,6 +484,21 @@
                    Visibility="Collapsed"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
+            <Image x:Name="AiCompanion" Width="18" Height="15"
+                   HorizontalAlignment="Right" VerticalAlignment="Top"
+                   Margin="0,74,26,0" Stretch="Uniform"
+                   RenderTransformOrigin="0.5,0.5"
+                   IsHitTestVisible="False" Panel.ZIndex="2"
+                   Visibility="Collapsed">
+                <Image.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform x:Name="AiCompanionScale" ScaleX="1" ScaleY="1" />
+                        <RotateTransform x:Name="AiCompanionRotate" Angle="0" />
+                        <TranslateTransform x:Name="AiCompanionTranslate" X="0" Y="0" />
+                    </TransformGroup>
+                </Image.RenderTransform>
+            </Image>
+
             <Viewbox x:Name="PlaceholderCharacter" Stretch="Uniform">
                 <Canvas Width="160" Height="210">
                     <Path Fill="#C9B6F2" Stroke="#8168B2" StrokeThickness="2"
@@ -483,6 +529,9 @@
                 </Canvas>
             </Viewbox>
 
+            <TextBlock x:Name="PetAccentText" HorizontalAlignment="Right" VerticalAlignment="Top"
+                       Margin="0,28,6,0" Foreground="#9A65BA" FontSize="19" FontWeight="SemiBold"
+                       IsHitTestVisible="False" />
             <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,0,0,0"
                     Background="#D9443659" CornerRadius="10" Padding="8,3" IsHitTestVisible="False">
                 <TextBlock x:Name="StateText" Text="待机" Foreground="White" FontSize="11" />

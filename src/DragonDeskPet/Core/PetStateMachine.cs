@@ -7,9 +7,9 @@ public sealed class PetStateMachine
 
     public event EventHandler<PetState>? StateChanged;
 
-    public void TransitionTo(PetState next)
+    public void TransitionTo(PetState next, bool restart = false)
     {
-        if (Current == next)
+        if (Current == next && !restart)
         {
             return;
         }

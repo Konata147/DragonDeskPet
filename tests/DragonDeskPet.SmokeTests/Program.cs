@@ -33,6 +33,7 @@ if (args is ["--ocr-sample", var imagePath])
     catch (Exception ex) { Console.WriteLine("OCR check failed: " + ex.GetType().Name); return 1; }
 }
 if (args is ["--render-ui", var renderDirectory]) return CourseLayoutChecks.Render(renderDirectory);
+if (args is ["--test-pet-interactions", var petRenderDirectory]) return PetInteractionTests.Run(petRenderDirectory);
 if (args is ["--probe-school-navigation"]) return SchoolNavigationProbe.Run();
 if (args is ["--test-school-redirect"]) return SchoolNavigationProbe.Run(syntheticRedirect: true);
 if (args is ["--course-sample", var samplePath])
@@ -84,6 +85,11 @@ await RunAsync("V0.4 weekly periods align seasonal makeup without changing clock
 await RunAsync("V0.4 locked Excel gives actionable feedback without changing data", () =>
 {
     CourseFileTests.LockedFile(); return Task.CompletedTask;
+});
+
+await RunAsync("pet actions respect activity priority and feedback ownership", () =>
+{
+    PetInteractionTests.CheckBehavior(); return Task.CompletedTask;
 });
 
 await RunAsync("state machine transitions exactly once", () =>

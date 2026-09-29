@@ -84,6 +84,7 @@ public partial class MainWindow : Window
     {
         _app = app;
         InitializeComponent();
+        InitializePetInteractions();
 
         if (File.Exists(AssetService.IconPath))
         {
@@ -102,6 +103,7 @@ public partial class MainWindow : Window
         _inactivityTimer.Tick += (_, _) =>
         {
             if (DateTimeOffset.Now - _lastInteraction >= TimeSpan.FromMinutes(5)
+                && !IsFocusing && !_isBusy
                 && _stateMachine.Current == PetState.Idle)
             {
                 _stateMachine.TransitionTo(PetState.Sleeping);
@@ -144,6 +146,7 @@ public partial class MainWindow : Window
             _app.CourseScheduleService,
             _app.PomodoroService);
         _loaded = true;
+        ApplyStateVisual(_stateMachine.Current);
         if (!_app.Settings.HasCompletedOnboarding)
         {
             OnboardingBubble.Visibility = Visibility.Visible;
@@ -182,6 +185,9 @@ public partial class MainWindow : Window
                     _stateImages[state] = AssetService.LoadCharacterAsset(state, LoadBitmap);
                 }
             }
+            _companionAnimator.LoadSources(idle, _stateImages[PetState.Hover],
+                _stateImages[PetState.Happy], _stateImages[PetState.Thinking],
+                _stateImages[PetState.Angry]);
 
             try
             {
@@ -203,6 +209,16 @@ public partial class MainWindow : Window
             }
 
             CharacterImage.Source = idle;
+            if (_animationLibrary.Load("Blink") is { } neutral)
+            {
+                _stateImages[PetState.Idle] = neutral.Frames[0];
+                CharacterImage.Source = neutral.Frames[0];
+                _artworkBounds.Union(new Rect(0, 0, 1, 1));
+            }
+            if (_animationLibrary.Load("Hover") is { } hover)
+                _stateImages[PetState.Hover] = hover.Frames[^1];
+            if (_animationLibrary.Load("Sleep") is { } sleep)
+                _stateImages[PetState.Sleeping] = sleep.Frames[0];
             CharacterImage.Visibility = Visibility.Visible;
             PlaceholderCharacter.Visibility = Visibility.Collapsed;
         }
@@ -244,11 +260,12 @@ public partial class MainWindow : Window
         Top = area.Bottom - LogicalSurfaceHeight - 18 - SurfaceTopPadding;
     }
 
-    private void MarkInteraction()
+    private void MarkInteraction(bool wake = true)
     {
         _lastInteraction = DateTimeOffset.Now;
-        if (_stateMachine.Current == PetState.Sleeping)
+        if (wake && _stateMachine.Current == PetState.Sleeping)
         {
+            _restingByChoice = false;
             _stateMachine.TransitionTo(PetState.Idle);
         }
     }
@@ -267,7 +284,8 @@ public partial class MainWindow : Window
 
         if (IsCharacterPixelHit(point))
         {
-            MarkInteraction();
+            MarkInteraction(wake: !_restingByChoice);
+            if (_restingByChoice) return;
             if (_stateMachine.Current is PetState.Idle or PetState.Sleeping)
             {
                 _stateMachine.TransitionTo(PetState.Hover);
@@ -326,6 +344,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        _wakeOnClick = _stateMachine.Current == PetState.Sleeping;
         MarkInteraction();
         if (!GetCursorPos(out _dragStartCursor)
             || !GetWindowRect(new WindowInteropHelper(this).Handle, out _dragStartWindow))
@@ -382,6 +401,7 @@ public partial class MainWindow : Window
         if (!_mouseDown)
         {
             UpdateHoverFromPointer(e.GetPosition(CharacterImage));
+            ObserveHeadStroke(e);
             return;
         }
 
@@ -534,8 +554,7 @@ public partial class MainWindow : Window
         if (_mouseDownClickCount >= 2)
         {
             ToggleChat();
-            _stateMachine.TransitionTo(PetState.Happy);
-            await ReturnToIdleAsync();
+            PlayPetActivity(PetActivity.Greet);
             return;
         }
 
@@ -543,7 +562,7 @@ public partial class MainWindow : Window
         ToggleQuickBar();
     }
 
-    private async Task CompleteDragAsync()
+    private Task CompleteDragAsync()
     {
         var wasDragging = _dragged || _stateMachine.Current == PetState.Dragged;
         if (wasDragging)
@@ -561,18 +580,26 @@ public partial class MainWindow : Window
 
         if (!wasDragging)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         MarkInteraction();
         SyncWindowPositionFromNative();
         SavePosition();
-        _stateMachine.TransitionTo(PetState.Happy);
-        await ReturnToIdleAsync();
+        if (_isBusy)
+            _stateMachine.TransitionTo(PetState.Thinking);
+        else
+        {
+            _stateMachine.TransitionTo(PetState.Idle);
+            PlayPetActivity(PetActivity.Land, automatic: true);
+        }
+        _wakeOnClick = false;
+        return Task.CompletedTask;
     }
 
     private void RegisterClick()
     {
+        if (!PetCanInteract) return;
         var now = DateTimeOffset.Now;
         _recentClicks.Enqueue(now);
         while (_recentClicks.Count > 0 && now - _recentClicks.Peek() > TimeSpan.FromSeconds(2.2))
@@ -583,9 +610,15 @@ public partial class MainWindow : Window
         if (_recentClicks.Count >= 5)
         {
             _recentClicks.Clear();
-            _stateMachine.TransitionTo(PetState.Angry);
+            _stateMachine.TransitionTo(PetState.Angry, restart: true);
             _ = ReturnToIdleAsync(1400);
         }
+        else
+        {
+            PlayPetActivity(_wakeOnClick ? PetActivity.Wake
+                : _clickReactionIndex++ % 2 == 0 ? PetActivity.Pet : PetActivity.Greet);
+        }
+        _wakeOnClick = false;
     }
 
     private void CharacterHost_MouseWheel(object sender, MouseWheelEventArgs e)
@@ -598,8 +631,9 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
-        MarkInteraction();
-        _stateMachine.TransitionTo(PetState.Hover);
+        MarkInteraction(wake: false);
+        if (_stateMachine.Current == PetState.Idle)
+            _stateMachine.TransitionTo(PetState.Hover);
     }
 
     private void CharacterHost_DragEnter(object sender, DragEventArgs e) => UpdateImageDragFeedback(e);
@@ -793,108 +827,43 @@ public partial class MainWindow : Window
 
     private void ApplyStateVisual(PetState state)
     {
-        StopStateAnimations();
-        if (_stateImages.TryGetValue(state, out var stateImage))
+        _animationPlayer.Stop();
+        _strokeRecognizer.Reset();
+        if (state is not (PetState.Idle or PetState.Hover)) CancelTreat();
+        _activePetActivity = null;
+        _petAnimator.Stop();
+        if (!(state == PetState.Happy && _preserveCharacterImageForAction)
+            && _stateImages.TryGetValue(state, out var stateImage))
         {
             CharacterImage.Source = stateImage;
         }
         StateText.Text = state switch
         {
-            PetState.Idle => "待机",
+            PetState.Idle => IsFocusing ? "安静陪你专注" : "待机",
             PetState.Hover => "嗯？",
             PetState.Dragged => "被拎起来了…",
             PetState.Thinking => "思考中…",
             PetState.Happy => "开心",
             PetState.Angry => "不要一直戳啦",
-            PetState.Sleeping => "Zzz…",
+            PetState.Sleeping => _restingByChoice ? "Zzz… 点击叫醒" : "Zzz…",
             _ => state.ToString()
         };
 
         CharacterHost.Opacity = state == PetState.Sleeping ? 0.78 : 1.0;
-        switch (state)
+        _companionAnimator.SetState(state, _app.Settings.ReducePetMotion,
+            _preserveCharacterImageForAction);
+        if (IsVisible && !_closing)
         {
-            case PetState.Idle:
-                PetTranslateTransform.BeginAnimation(
-                    System.Windows.Media.TranslateTransform.YProperty,
-                    new DoubleAnimation(0, -2.5, TimeSpan.FromSeconds(1.6))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = RepeatBehavior.Forever,
-                        EasingFunction = new SineEase()
-                    });
-                break;
-            case PetState.Hover:
-                AnimateScale(1.04, 180);
-                break;
-            case PetState.Dragged:
-                PetRotateTransform.Angle = -5;
-                PetTranslateTransform.Y = 7;
-                AnimateScale(0.96, 120);
-                break;
-            case PetState.Thinking:
-                PetRotateTransform.BeginAnimation(
-                    System.Windows.Media.RotateTransform.AngleProperty,
-                    new DoubleAnimation(-2.5, 2.5, TimeSpan.FromMilliseconds(260))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = RepeatBehavior.Forever
-                    });
-                break;
-            case PetState.Happy:
-                PetTranslateTransform.BeginAnimation(
-                    System.Windows.Media.TranslateTransform.YProperty,
-                    new DoubleAnimation(0, -11, TimeSpan.FromMilliseconds(180))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = new RepeatBehavior(2)
-                    });
-                break;
-            case PetState.Angry:
-                PetTranslateTransform.BeginAnimation(
-                    System.Windows.Media.TranslateTransform.XProperty,
-                    new DoubleAnimation(-5, 5, TimeSpan.FromMilliseconds(70))
-                    {
-                        AutoReverse = true,
-                        RepeatBehavior = new RepeatBehavior(5)
-                    });
-                break;
-            case PetState.Sleeping:
-                PetRotateTransform.Angle = 4;
-                PetTranslateTransform.Y = 7;
-                AnimateScale(0.96, 300);
-                break;
+            _petAnimator.ShowState(state, _app.Settings.ReducePetMotion, IsFocusing);
+            if (state == PetState.Hover && !_app.Settings.ReducePetMotion) PlayQuietClip("Hover");
         }
-    }
-
-    private void StopStateAnimations()
-    {
-        PetStateScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
-        PetStateScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
-        PetRotateTransform.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
-        PetTranslateTransform.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
-        PetTranslateTransform.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, null);
-        PetStateScaleTransform.ScaleX = 1;
-        PetStateScaleTransform.ScaleY = 1;
-        PetRotateTransform.Angle = 0;
-        PetTranslateTransform.X = 0;
-        PetTranslateTransform.Y = 0;
-    }
-
-    private void AnimateScale(double target, int milliseconds)
-    {
-        var animation = new DoubleAnimation(1, target, TimeSpan.FromMilliseconds(milliseconds))
-        {
-            FillBehavior = FillBehavior.HoldEnd
-        };
-        PetStateScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, animation);
-        PetStateScaleTransform.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, animation);
     }
 
     private async Task ReturnToIdleAsync(int delayMilliseconds = 900)
     {
         var feedbackRevision = _stateMachine.Revision;
         await Task.Delay(delayMilliseconds);
-        if (!_mouseDown && !_dragged)
+        if (!_closing && !_mouseDown && !_dragged)
         {
             _stateMachine.TryFinishFeedback(feedbackRevision, IsPointerOverCharacter());
         }
@@ -1290,13 +1259,16 @@ public partial class MainWindow : Window
             ApplyNativeTopmost(Topmost);
             UpdateTopmostIndicators();
             ApplyScale(saved.Scale, save: false);
+            ApplyStateVisual(_stateMachine.Current);
             _app.SettingsService.Save(saved);
             StartupService.SetEnabled(saved.StartWithWindows);
         })
         {
             Owner = this
         };
-        window.ShowDialog();
+        _settingsOpen = true;
+        try { window.ShowDialog(); }
+        finally { _settingsOpen = false; }
         ApplyNativeTopmost(Topmost);
     }
 
@@ -1383,7 +1355,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Window_Deactivated(object? sender, EventArgs e) => HideQuickBar();
+    private void Window_Deactivated(object? sender, EventArgs e) { HideQuickBar(); CancelTreat(); }
 
     private void ProductivityTimer_Tick(object? sender, EventArgs e)
     {
@@ -1397,6 +1369,7 @@ public partial class MainWindow : Window
         }
 
         PresentNextPendingAlert(nowUtc);
+        TickPetInteractions(nowUtc);
     }
 
     private void PresentNextPendingAlert(DateTimeOffset nowUtc)
@@ -1452,8 +1425,9 @@ public partial class MainWindow : Window
             _app.ProductivityStore.Save();
         }
 
-        _stateMachine.TransitionTo(PetState.Happy);
-        _ = ReturnToIdleAsync(1200);
+        if (PetCanInteract && !_restingByChoice)
+            PlayPetActivity(alert.Source == AlertSource.Pomodoro ? PetActivity.Celebrate : PetActivity.Greet,
+                automatic: true);
     }
 
     private void CompleteAlert_Click(object sender, RoutedEventArgs e)
@@ -1561,6 +1535,14 @@ public partial class MainWindow : Window
         SavePosition();
         if (AllowClose)
         {
+            _closing = true;
+            CancelTreat();
+            _animationPlayer.Dispose();
+            _petAnimator.Stop();
+            _companionAnimator.Suspend();
+            _app.PomodoroService.StateChanged -= PomodoroPetStateChanged;
+            _inactivityTimer.Stop();
+            _positionSaveTimer.Stop();
             _dragTimer.Stop();
             _fullscreenTimer.Stop();
             _productivityTimer.Stop();

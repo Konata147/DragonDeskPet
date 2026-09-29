@@ -32,6 +32,8 @@ public partial class SettingsWindow : Window
         ScaleSlider.Value = current.Scale;
         AlwaysOnTopBox.IsChecked = current.AlwaysOnTop;
         AutoHideInFullscreenBox.IsChecked = current.AutoHideInFullscreen;
+        AmbientPetActionsBox.IsChecked = current.AmbientPetActionsEnabled;
+        ReducePetMotionBox.IsChecked = current.ReducePetMotion;
         StartWithWindowsBox.IsChecked = current.StartWithWindows;
         ReminderSoundBox.IsChecked = current.ReminderSoundEnabled;
         FocusMinutesBox.Text = current.PomodoroFocusMinutes.ToString();
@@ -119,6 +121,8 @@ public partial class SettingsWindow : Window
             Scale = Math.Round(ScaleSlider.Value, 1),
             AlwaysOnTop = AlwaysOnTopBox.IsChecked == true,
             AutoHideInFullscreen = AutoHideInFullscreenBox.IsChecked == true,
+            AmbientPetActionsEnabled = AmbientPetActionsBox.IsChecked == true,
+            ReducePetMotion = ReducePetMotionBox.IsChecked == true,
             ReminderSoundEnabled = ReminderSoundBox.IsChecked == true,
             PomodoroFocusMinutes = focusMinutes,
             PomodoroShortBreakMinutes = shortBreakMinutes,

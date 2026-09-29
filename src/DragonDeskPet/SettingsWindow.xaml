@@ -269,6 +269,8 @@
                         <CheckBox x:Name="AlwaysOnTopBox" Content="始终置顶" />
                         <CheckBox x:Name="AutoHideInFullscreenBox" Content="全屏程序运行时自动隐藏" />
                         <TextBlock Text="离开全屏后静默恢复；手动隐藏时不会自动弹出。" Margin="21,-2,0,3" FontSize="10.5" Foreground="{StaticResource SettingsMuted}" TextWrapping="Wrap" />
+                        <CheckBox x:Name="AmbientPetActionsBox" Content="闲暇时偶尔做小动作（专注时暂停）" />
+                        <CheckBox x:Name="ReducePetMotionBox" Content="减少动态效果（保留表情与互动文字）" />
                         <CheckBox x:Name="StartWithWindowsBox" Content="登录 Windows 时自动启动" />
                     </StackPanel>
                 </Border>

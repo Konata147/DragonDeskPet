@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <Content Include="..\..\assets\**\*.*"
-             Exclude="..\..\assets\character\candidates\**\*.*"
+             Exclude="..\..\assets\character\candidates\**\*.*;..\..\assets\character\animations\sources\**\*.*"
              Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\docs\course-template.csv"

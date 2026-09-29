@@ -1,0 +1,312 @@
+[
+  {
+    "Id": "Blink",
+    "Frames": [
+      "Blink/00.png",
+      "Blink/01.png",
+      "Blink/02.png",
+      "Blink/03.png",
+      "Blink/04.png",
+      "Blink/05.png"
+    ],
+    "DurationsMs": [
+      75,
+      60,
+      75,
+      75,
+      60,
+      85
+    ],
+    "PosterFrame": 2
+  },
+  {
+    "Id": "Hover",
+    "Frames": [
+      "Hover/00.png",
+      "Hover/01.png",
+      "Hover/02.png",
+      "Hover/03.png"
+    ],
+    "DurationsMs": [
+      90,
+      140,
+      180,
+      130
+    ],
+    "PosterFrame": 2
+  },
+  {
+    "Id": "Greet",
+    "Frames": [
+      "Greet/00.png",
+      "Greet/01.png",
+      "Greet/02.png",
+      "Greet/03.png",
+      "Greet/04.png",
+      "Greet/05.png"
+    ],
+    "DurationsMs": [
+      110,
+      120,
+      140,
+      240,
+      130,
+      230
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Pet",
+    "Frames": [
+      "Pet/00.png",
+      "Pet/01.png",
+      "Pet/02.png",
+      "Pet/03.png",
+      "Pet/04.png",
+      "Pet/05.png"
+    ],
+    "DurationsMs": [
+      130,
+      160,
+      220,
+      360,
+      170,
+      220
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Feed",
+    "Frames": [
+      "Feed/00.png",
+      "Feed/01.png",
+      "Feed/02.png",
+      "Feed/03.png",
+      "Feed/04.png",
+      "Feed/05.png"
+    ],
+    "DurationsMs": [
+      120,
+      170,
+      170,
+      250,
+      160,
+      240
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Cuddle",
+    "Frames": [
+      "Cuddle/00.png",
+      "Cuddle/01.png",
+      "Cuddle/02.png",
+      "Cuddle/03.png",
+      "Cuddle/04.png",
+      "Cuddle/05.png"
+    ],
+    "DurationsMs": [
+      150,
+      180,
+      200,
+      330,
+      180,
+      220
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Hop",
+    "Frames": [
+      "Hop/00.png",
+      "Hop/01.png",
+      "Hop/02.png",
+      "Hop/03.png",
+      "Hop/04.png",
+      "Hop/05.png"
+    ],
+    "DurationsMs": [
+      200,
+      220,
+      340,
+      240,
+      300,
+      500
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Dance",
+    "Frames": [
+      "Dance/00.png",
+      "Dance/01.png",
+      "Dance/02.png",
+      "Dance/03.png",
+      "Dance/04.png",
+      "Dance/05.png"
+    ],
+    "DurationsMs": [
+      130,
+      160,
+      160,
+      160,
+      160,
+      250
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Stretch",
+    "Frames": [
+      "Stretch/00.png",
+      "Stretch/01.png",
+      "Stretch/02.png",
+      "Stretch/03.png",
+      "Stretch/04.png",
+      "Stretch/05.png"
+    ],
+    "DurationsMs": [
+      140,
+      160,
+      200,
+      330,
+      180,
+      240
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "LookAround",
+    "Frames": [
+      "LookAround/00.png",
+      "LookAround/01.png",
+      "LookAround/02.png",
+      "LookAround/03.png",
+      "LookAround/04.png",
+      "LookAround/05.png"
+    ],
+    "DurationsMs": [
+      160,
+      170,
+      220,
+      230,
+      170,
+      230
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Land",
+    "Frames": [
+      "Land/00.png",
+      "Land/01.png",
+      "Land/02.png",
+      "Land/03.png",
+      "Land/04.png",
+      "Land/05.png"
+    ],
+    "DurationsMs": [
+      100,
+      130,
+      130,
+      160,
+      130,
+      170
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Wake",
+    "Frames": [
+      "Wake/00.png",
+      "Wake/01.png",
+      "Wake/02.png",
+      "Wake/03.png",
+      "Wake/04.png",
+      "Wake/05.png"
+    ],
+    "DurationsMs": [
+      150,
+      200,
+      230,
+      250,
+      180,
+      220
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Celebrate",
+    "Frames": [
+      "Celebrate/00.png",
+      "Celebrate/01.png",
+      "Celebrate/02.png",
+      "Celebrate/03.png",
+      "Celebrate/04.png",
+      "Celebrate/05.png"
+    ],
+    "DurationsMs": [
+      160,
+      180,
+      210,
+      300,
+      200,
+      260
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Tail",
+    "Frames": [
+      "Tail/00.png",
+      "Tail/01.png",
+      "Tail/02.png",
+      "Tail/03.png",
+      "Tail/04.png",
+      "Tail/05.png"
+    ],
+    "DurationsMs": [
+      180,
+      220,
+      260,
+      260,
+      220,
+      260
+    ],
+    "PosterFrame": 3
+  },
+  {
+    "Id": "Sleep",
+    "Frames": [
+      "Sleep/00.png",
+      "Sleep/01.png",
+      "Sleep/02.png",
+      "Sleep/03.png",
+      "Sleep/04.png",
+      "Sleep/05.png"
+    ],
+    "DurationsMs": [
+      300,
+      350,
+      450,
+      470,
+      450,
+      480
+    ],
+    "PosterFrame": 4
+  },
+  {
+    "Id": "SleepBreath",
+    "Frames": [
+      "Sleep/02.png",
+      "Sleep/03.png",
+      "Sleep/02.png"
+    ],
+    "DurationsMs": [
+      900,
+      900,
+      900
+    ],
+    "PosterFrame": 1
+  }
+]

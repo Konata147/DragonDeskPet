@@ -9,6 +9,8 @@ public sealed class AppSettings
     public double Scale { get; set; } = 1.0;
     public bool AlwaysOnTop { get; set; } = true;
     public bool AutoHideInFullscreen { get; set; } = true;
+    public bool AmbientPetActionsEnabled { get; set; } = true;
+    public bool ReducePetMotion { get; set; }
     public bool ReminderSoundEnabled { get; set; } = true;
     public int PomodoroFocusMinutes { get; set; } = 25;
     public int PomodoroShortBreakMinutes { get; set; } = 5;
