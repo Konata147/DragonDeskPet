@@ -7,7 +7,7 @@ namespace DragonDeskPet.Services;
 /// <summary>One finite clip at a time. No ticking timer when stopped or showing a static poster.</summary>
 public sealed class PetAnimationPlayer : IDisposable
 {
-    private readonly DispatcherTimer _timer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
+    private readonly DispatcherTimer _timer = new(DispatcherPriority.Render);
     private readonly Stopwatch _watch = new();
     private LoadedPetAnimation? _animation;
     private Action? _completed;
@@ -30,8 +30,21 @@ public sealed class PetAnimationPlayer : IDisposable
         if (elapsedMilliseconds >= animation.Clip.DurationMs)
         { var completed = _completed; Stop(); completed?.Invoke(); return; }
         var index = animation.Clip.FrameAt(elapsedMilliseconds);
-        if (index == _frame) return;
-        _frame = index; FrameChanged?.Invoke(animation.Frames[index]);
+        if (index != _frame)
+        {
+            var changed = _frame < 0 || !ReferenceEquals(animation.Frames[_frame], animation.Frames[index]);
+            _frame = index;
+            if (changed) FrameChanged?.Invoke(animation.Frames[index]);
+        }
+        // Wake at the next *different* pose, or at completion. Repeated frame
+        // paths are holds, not another redraw of the same full character.
+        long boundary = 0;
+        for (var i = 0; i <= index; i++) boundary += animation.Clip.DurationsMs[i];
+        for (var i = index + 1; i < animation.Frames.Length
+                && ReferenceEquals(animation.Frames[i], animation.Frames[index]); i++)
+            boundary += animation.Clip.DurationsMs[i];
+        _timer.Interval = TimeSpan.FromMilliseconds(Math.Max(1,
+            boundary - Math.Max(elapsedMilliseconds, _watch.ElapsedMilliseconds)));
     }
     public void Dispose() { Stop(); _timer.Tick -= Tick; }
 }

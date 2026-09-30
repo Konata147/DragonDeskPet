@@ -55,11 +55,13 @@ internal static class PetInteractionTests
         {
             var id = PetInteractionVariants.ClipId(dance);
             var animation = library.Load(id) ?? throw new InvalidOperationException($"Missing {id}");
-            Require(animation.Clip.DurationMs == 8000 && animation.Clip.Frames.Length == 32,
+            Require(animation.Clip.DurationMs == 8000 && animation.Clip.Frames.Length is >= 20 and <= 32
+                && animation.Clip.DurationsMs.Distinct().Count() >= 3,
                 $"Dance must be a finite eight-second phrase: {id}");
             Require(animation.Frames.Distinct().Count() >= 5,
                 $"Dance uses too few different poses: {id}");
             CheckVariantFrameGeometry(id, animation);
+            CheckDanceContinuity(id, animation);
             dancePosters.Add(CopyPixels(animation.Frames[animation.Clip.PosterFrame]));
         }
         for (var i = 0; i < dancePosters.Count; i++)
@@ -67,6 +69,35 @@ internal static class PetInteractionTests
                 Require(!dancePosters[i].SequenceEqual(dancePosters[j]),
                     "Two dances share the same representative pose.");
         Console.WriteLine("PASS: five distinct snacks, three distinct finite 8-second dances, full-frame margins and stable feet.");
+    }
+
+    private static void CheckDanceContinuity(string id, LoadedPetAnimation animation)
+    {
+        var pixels = animation.Frames.Distinct().ToDictionary(frame => frame, frame =>
+        {
+            var converted = new FormatConvertedBitmap(frame, PixelFormats.Pbgra32, null, 0);
+            return CopyPixels(converted);
+        });
+        var abrupt = 0;
+        for (var i = 1; i < animation.Frames.Length; i++)
+        {
+            var before = animation.Frames[i - 1]; var after = animation.Frames[i];
+            if (ReferenceEquals(before, after)) continue;
+            var a = pixels[before]; var b = pixels[after];
+            long difference = 0; var samples = 0;
+            for (var y = 0; y < 512; y += 4)
+                for (var x = 0; x < 512; x += 4)
+                {
+                    var offset = (y * 512 + x) * 4;
+                    for (var channel = 0; channel < 4; channel++)
+                        difference += Math.Abs(a[offset + channel] - b[offset + channel]);
+                    samples++;
+                }
+            var score = 100d * difference / (samples * 4 * 255);
+            if (score > 12) abrupt++;
+        }
+        Require(abrupt <= (id == "DanceWingTail" ? 2 : 0),
+            $"Abrupt unrelated pose jump in {id}: {abrupt}");
     }
 
     private static void CheckVariantFrameGeometry(string id, LoadedPetAnimation animation)
@@ -374,13 +405,13 @@ internal static class PetInteractionTests
         player.Play(animation, false, () => completed++);
         advance.Invoke(player, [100L]);
         advance.Invoke(player, [200L]);
-        Require(shown == 2 && completed == 1 && !player.IsPlaying,
+        Require(shown == 1 && completed == 1 && !player.IsPlaying,
             "Finite clip did not stop and complete exactly once.");
         player.Play(animation, false, () => completed++);
         player.Stop(); advance.Invoke(player, [200L]);
         Require(completed == 1 && !player.IsPlaying, "Stopped clip completed after interruption.");
         player.Play(animation, true, () => completed++);
-        Require(shown == 4 && completed == 1 && !player.IsPlaying,
+        Require(shown == 3 && completed == 1 && !player.IsPlaying,
             "Reduced-motion clip must show only its poster frame.");
         Console.WriteLine("PASS: player stops at the final frame, ignores interrupted callbacks and shows one static poster.");
     }

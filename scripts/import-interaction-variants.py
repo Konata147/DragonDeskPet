@@ -38,21 +38,33 @@ SHEETS = {
 }
 
 DANCE_SEQUENCES = {
-    # Eight beats per phrase: entrance, development, accent, then a clear settle.
-    # Repeated indices hold a key pose; they are not an endless dance loop.
-    "DanceStep": [0, 0, 1, 1, 2, 2, 3, 4,
-                  1, 3, 4, 5, 1, 2, 3, 4,
-                  5, 6, 4, 3, 1, 2, 4, 5,
-                  6, 5, 3, 2, 1, 1, 0, 0],
-    "DanceGuofeng": [0, 0, 1, 1, 2, 2, 3, 3,
-                     4, 4, 1, 2, 3, 3, 5, 5,
-                     1, 2, 2, 3, 4, 4, 5, 6,
-                     6, 5, 4, 3, 2, 1, 0, 0],
-    "DanceWingTail": [0, 0, 1, 1, 2, 2, 3, 3,
-                      4, 4, 1, 2, 3, 4, 2, 0,
-                      1, 3, 4, 2, 1, 0, 3, 4,
-                      2, 3, 5, 5, 3, 2, 0, 0],
+    # The same PNGs as .11, sequenced through visually adjacent poses.
+    # Each eight-second phrase has an entrance, development, accent and settle.
+    "DanceStep": [0, 2, 3, 2, 1, 2, 3, 2, 1, 2,
+                  5, 6, 4, 6, 5, 6, 4, 6, 5, 2,
+                  3, 2, 1, 2, 0],
+    "DanceGuofeng": [0, 5, 4, 5, 0, 1, 2, 3,
+                     2, 1, 0, 5, 4, 5, 0, 1,
+                     2, 3, 2, 1, 0, 5, 6, 0],
+    "DanceWingTail": [0, 1, 0, 2, 0, 3, 4, 3,
+                      0, 1, 0, 2, 0, 3, 4, 3,
+                      0, 3, 5, 3, 4, 3, 0, 0],
 }
+
+DANCE_DURATIONS = {
+    "DanceStep": [450] + [310] * 23 + [420],
+    "DanceGuofeng": [430] + [330] * 22 + [310],
+    "DanceWingTail": [410] + [330] * 23,
+}
+# Let each phrase breathe at its accent, then release without adding any
+# whole-character transform or synthesizing ghosted in-between artwork.
+DANCE_DURATIONS["DanceStep"][12] += 150
+DANCE_DURATIONS["DanceStep"][13] -= 150
+DANCE_DURATIONS["DanceGuofeng"][22] += 170
+DANCE_DURATIONS["DanceGuofeng"][21] -= 170
+DANCE_DURATIONS["DanceWingTail"][18] += 370
+DANCE_DURATIONS["DanceWingTail"][17] -= 160
+DANCE_DURATIONS["DanceWingTail"][19] -= 210
 
 
 def main_component(image: Image.Image) -> Image.Image:
@@ -180,12 +192,16 @@ def register_clips() -> None:
             durations = [170, 260, 320, 620, 260]
         else:
             sequence = DANCE_SEQUENCES[name]
-            durations = [250] * len(sequence)
+            durations = DANCE_DURATIONS[name]
+            if len(sequence) != len(durations) or sum(durations) != 8000:
+                raise ValueError(f"Invalid eight-second choreography: {name}")
         additions.append({
             "Id": name,
             "Frames": [f"{name}/{i:02}.png" for i in sequence],
             "DurationsMs": durations,
-            "PosterFrame": 3 if name.startswith("Feed") else 4,
+            "PosterFrame": 3 if name.startswith("Feed") else {
+                "DanceStep": 12, "DanceGuofeng": 7, "DanceWingTail": 18,
+            }[name],
         })
     if all(name in existing for name in names):
         revisions = {clip["Id"]: clip for clip in additions}
