@@ -86,7 +86,8 @@ public partial class MainWindow
         _propHideTimer.Tick += (_, _) =>
         {
             _propHideTimer.Stop();
-            if (!CharacterHost.IsMouseOver && !PetPropBar.IsMouseOver) HidePetProps();
+            if (!CharacterHost.IsMouseOver && !PetPropBar.IsMouseOver && !PetChoicePanel.IsMouseOver)
+                HidePetProps();
         };
         _petAnimator = new PetAnimator(PetStateScaleTransform, PetRotateTransform,
             PetTranslateTransform, PetAccentText);
@@ -156,7 +157,8 @@ public partial class MainWindow
     private void PetActivity_Click(object sender, RoutedEventArgs e)
     {
         if (!PetCanInteract || sender is not MenuItem { Tag: string action }) return;
-        if (action == "Feed") { ShowTreat(); return; }
+        if (action == "Feed") { ShowPetChoicesFromMenu(PetChoiceKind.Snacks); return; }
+        if (action == "Dance") { ShowPetChoicesFromMenu(PetChoiceKind.Dances); return; }
         if (action == "Rest")
         {
             if (_stateMachine.Current == PetState.Sleeping)
@@ -171,7 +173,8 @@ public partial class MainWindow
         if (Enum.TryParse<PetActivity>(action, out var activity)) PlayPetActivity(activity);
     }
 
-    private void PlayPetActivity(PetActivity activity, bool automatic = false)
+    private void PlayPetActivity(PetActivity activity, bool automatic = false,
+        string? clipId = null, string? caption = null)
     {
         if (!PetCanInteract) return;
         var now = DateTimeOffset.UtcNow;
@@ -185,18 +188,19 @@ public partial class MainWindow
         _nextAmbientAction = now.AddSeconds(Random.Shared.Next(35, 61));
         _nextBlink = now.AddSeconds(Random.Shared.Next(5, 11));
         var info = PetActivities.Describe(activity);
-        var clip = _animationLibrary.Load(activity.ToString());
+        var clip = _animationLibrary.Load(clipId ?? activity.ToString());
         // StateChanged is synchronous. Keep the current pose until the clip's
         // first frame is ready instead of flashing the unrelated Happy sprite.
         _preserveCharacterImageForAction = clip is not null;
         try { _stateMachine.TransitionTo(PetState.Happy, restart: true); }
         finally { _preserveCharacterImageForAction = false; }
         _activePetActivity = activity;
-        StateText.Text = info.Caption;
+        StateText.Text = caption ?? info.Caption;
         if (clip is not null) _companionAnimator.React(activity);
         if (clip is null)
         {
-            _petAnimator.Play(activity, _app.Settings.ReducePetMotion);
+            // A missing variant must stay still, never borrow a generic dance or sway.
+            if (clipId is null) _petAnimator.Play(activity, _app.Settings.ReducePetMotion);
             _ = ReturnToIdleAsync(info.DurationMilliseconds);
         }
         else
@@ -209,7 +213,7 @@ public partial class MainWindow
             });
             if (activity == PetActivity.Hop && !_app.Settings.ReducePetMotion)
                 _petAnimator.PlayHopMotion(_app.Settings.Scale);
-            if (_app.Settings.ReducePetMotion) _ = ReturnToIdleAsync(info.DurationMilliseconds);
+            if (_app.Settings.ReducePetMotion) _ = ReturnToIdleAsync(clip.Clip.DurationMs);
         }
     }
 

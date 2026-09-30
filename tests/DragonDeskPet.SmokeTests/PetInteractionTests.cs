@@ -13,6 +13,179 @@ using WpfImage = System.Windows.Controls.Image;
 
 internal static class PetInteractionTests
 {
+    public static int RunVariants(string directory)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                Directory.CreateDirectory(directory);
+                CheckVariantArtwork();
+                CheckVariantPlayback();
+                RenderVariantChoices(directory);
+            }
+            catch (Exception ex) { failure = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start(); thread.Join();
+        if (failure is not null) { Console.WriteLine(failure); return 1; }
+        return 0;
+    }
+
+    private static void CheckVariantArtwork()
+    {
+        var library = new PetAnimationLibrary(Path.Combine(AppContext.BaseDirectory, "assets", "character", "animations"));
+        var snackPosters = new List<byte[]>();
+        foreach (var snack in PetInteractionVariants.Snacks)
+        {
+            var id = PetInteractionVariants.ClipId(snack);
+            var animation = library.Load(id) ?? throw new InvalidOperationException($"Missing {id}");
+            Require(animation.Clip.DurationMs is >= 1400 and <= 2200 && animation.Clip.IsValid,
+                $"Invalid feeding timing: {id}");
+            CheckVariantFrameGeometry(id, animation);
+            snackPosters.Add(CopyPixels(animation.Frames[animation.Clip.PosterFrame]));
+        }
+        for (var i = 0; i < snackPosters.Count; i++)
+            for (var j = i + 1; j < snackPosters.Count; j++)
+                Require(!snackPosters[i].SequenceEqual(snackPosters[j]),
+                    "Two snacks share the same reaction poster.");
+        var dancePosters = new List<byte[]>();
+        foreach (var dance in PetInteractionVariants.Dances)
+        {
+            var id = PetInteractionVariants.ClipId(dance);
+            var animation = library.Load(id) ?? throw new InvalidOperationException($"Missing {id}");
+            Require(animation.Clip.DurationMs == 8000 && animation.Clip.Frames.Length == 32,
+                $"Dance must be a finite eight-second phrase: {id}");
+            Require(animation.Frames.Distinct().Count() >= 5,
+                $"Dance uses too few different poses: {id}");
+            CheckVariantFrameGeometry(id, animation);
+            dancePosters.Add(CopyPixels(animation.Frames[animation.Clip.PosterFrame]));
+        }
+        for (var i = 0; i < dancePosters.Count; i++)
+            for (var j = i + 1; j < dancePosters.Count; j++)
+                Require(!dancePosters[i].SequenceEqual(dancePosters[j]),
+                    "Two dances share the same representative pose.");
+        Console.WriteLine("PASS: five distinct snacks, three distinct finite 8-second dances, full-frame margins and stable feet.");
+    }
+
+    private static void CheckVariantFrameGeometry(string id, LoadedPetAnimation animation)
+    {
+        foreach (var frame in animation.Frames.Distinct())
+        {
+            Require(frame.PixelWidth == 512 && frame.PixelHeight == 512, $"Wrong canvas: {id}");
+            var pixels = CopyPixels(frame);
+            var minX = 512; var minY = 512; var maxX = -1; var maxY = -1; var foot = -1;
+            var leftWing = 0; var rightWing = 0; var body = 0;
+            for (var y = 0; y < 512; y++)
+                for (var x = 0; x < 512; x++)
+                {
+                    if (pixels[(y * 512 + x) * 4 + 3] < 96) continue;
+                    minX = Math.Min(minX, x); minY = Math.Min(minY, y);
+                    maxX = Math.Max(maxX, x); maxY = Math.Max(maxY, y);
+                    if (x is >= 220 and <= 290 && y > 460) foot = Math.Max(foot, y);
+                    if (y is >= 210 and <= 370)
+                    {
+                        if (x < 155) leftWing++;
+                        else if (x > 357) rightWing++;
+                        else body++;
+                    }
+                }
+            Require(minX >= 4 && minY >= 4 && maxX <= 507 && maxY <= 507,
+                $"Cropped variant silhouette: {id}, {(minX, minY, maxX, maxY)}");
+            Require(foot is >= 490 and <= 502, $"Unstable foot anchor: {id}, {foot}");
+            Require(leftWing > 350 && rightWing > 350 && body > 2000,
+                $"Wing or body is missing in {id}: {leftWing}/{rightWing}/{body}");
+        }
+    }
+
+    private static void CheckVariantPlayback()
+    {
+        var library = new PetAnimationLibrary(Path.Combine(AppContext.BaseDirectory, "assets", "character", "animations"));
+        var first = library.Load("DanceStep")!;
+        var second = library.Load("DanceWingTail")!;
+        using var player = new PetAnimationPlayer();
+        var oldCompletion = 0;
+        var newCompletion = 0;
+        BitmapSource? shown = null;
+        player.FrameChanged += frame => shown = frame;
+        player.Play(first, false, () => oldCompletion++);
+        Require(player.IsPlaying && ReferenceEquals(shown, first.Frames[0]),
+            "The first selected dance did not start on its own frame.");
+        player.Play(second, false, () => newCompletion++);
+        typeof(PetAnimationPlayer).GetMethod("Advance", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(player, [2250L]);
+        Require(player.IsPlaying && ReferenceEquals(shown, second.Frames[second.Clip.FrameAt(2250)])
+            && oldCompletion == 0, "A previous dance survived interruption.");
+        typeof(PetAnimationPlayer).GetMethod("Advance", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(player, [(long)second.Clip.DurationMs]);
+        Require(!player.IsPlaying && oldCompletion == 0 && newCompletion == 1,
+            "The selected dance did not end exactly once.");
+        player.Play(first, true, () => oldCompletion++);
+        Require(!player.IsPlaying && ReferenceEquals(shown, first.Frames[first.Clip.PosterFrame])
+            && oldCompletion == 0, "Reduced motion did not hold a static dance pose.");
+        player.Stop();
+        Require(!player.IsPlaying && player.CurrentFrameIndex == -1,
+            "Hiding did not stop a selected variant.");
+        Console.WriteLine("PASS: selected dance replacement, one-shot completion, static mode and stop.");
+    }
+
+    private static void RenderVariantChoices(string directory)
+    {
+        var app = new App(); app.InitializeComponent();
+        var store = new ProductivityStore(Path.Combine(directory, "isolated-data"));
+        typeof(App).GetProperty(nameof(App.PomodoroService))!.SetValue(app, new PomodoroService(store, () => app.Settings));
+        var window = new MainWindow(app);
+        foreach (var field in typeof(MainWindow).GetFields(BindingFlags.Instance | BindingFlags.NonPublic))
+            if (field.GetValue(window) is DispatcherTimer timer) timer.Stop();
+        Invoke(window, "LoadCharacterAssets");
+        var root = (Grid)window.Content;
+        var layer = (Canvas)window.FindName("PetPropLayer");
+        var panel = (Border)window.FindName("PetChoicePanel");
+        var bar = (StackPanel)window.FindName("PetPropBar");
+        var items = (StackPanel)window.FindName("PetChoiceItems");
+        var kind = typeof(MainWindow).GetNestedType("PetChoiceKind", BindingFlags.NonPublic)!;
+        foreach (var scale in new[] { .6, 1.0, 2.0 })
+        {
+            Invoke(window, "ApplyScale", scale, false);
+            Invoke(window, "ApplyStateVisual", PetState.Idle);
+            root.Measure(new System.Windows.Size(830, 590));
+            root.Arrange(new Rect(0, 0, 830, 590)); root.UpdateLayout();
+            layer.Visibility = Visibility.Visible;
+            Invoke(window, "PositionPetProps");
+            foreach (var (name, count) in new[] { ("Snacks", 5), ("Dances", 3) })
+            {
+                var choice = Enum.Parse(kind, name);
+                Invoke(window, "ConfigurePetChoices", choice);
+                panel.Visibility = Visibility.Visible;
+                Invoke(window, "PositionPetChoices", choice);
+                root.UpdateLayout();
+                Require(items.Children.Count == count, $"Wrong number of {name} options.");
+                var bounds = panel.TransformToAncestor(root).TransformBounds(new Rect(panel.RenderSize));
+                var barBounds = bar.TransformToAncestor(root).TransformBounds(new Rect(bar.RenderSize));
+                Require(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 830 && bounds.Bottom <= 590,
+                    $"{name} chooser is clipped at {scale:P0}: {bounds}");
+                Require(bounds.Right + 4 <= barBounds.Left,
+                    $"{name} chooser overlaps the default props at {scale:P0}.");
+                foreach (System.Windows.Controls.Button button in items.Children)
+                {
+                    var buttonBounds = button.TransformToAncestor(root).TransformBounds(new Rect(button.RenderSize));
+                    Require(bounds.Contains(buttonBounds), $"{name} option is clipped inside its chooser.");
+                    var hit = VisualTreeHelper.HitTest(root, new System.Windows.Point(
+                        buttonBounds.Left + buttonBounds.Width / 2, buttonBounds.Top + buttonBounds.Height / 2))?.VisualHit;
+                    while (hit is not null && !ReferenceEquals(hit, button)) hit = VisualTreeHelper.GetParent(hit);
+                    Require(ReferenceEquals(hit, button), $"{name} choice cannot be clicked at {scale:P0}.");
+                }
+                Save(root, 830, 590, Path.Combine(directory, $"{name.ToLowerInvariant()}-scale-{scale:0.0}.png"));
+            }
+        }
+        Invoke(window, "HidePetProps");
+        Require(panel.Visibility == Visibility.Collapsed && layer.Visibility == Visibility.Collapsed,
+            "Hidden pet still has an open choice panel.");
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        Console.WriteLine("PASS: five/three choice targets visible and clickable at 60%, 100%, 200%; hide closes chooser.");
+    }
+
     public static void CheckBehavior()
     {
         CheckFeedbackOwnership();

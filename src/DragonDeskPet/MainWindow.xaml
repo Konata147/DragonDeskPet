@@ -443,6 +443,7 @@
             <Button x:Name="PetPropSnack" Width="34" Height="34" Margin="2,0,2,6"
                     Padding="0" Cursor="Hand" ToolTip="拖到嘴边投喂"
                     Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+                    MouseEnter="PetPropSnack_MouseEnter"
                     PreviewMouseLeftButtonDown="PetPropSnack_PreviewMouseLeftButtonDown">
                 <Grid Width="21" Height="21">
                     <Ellipse Fill="#E5BA7B" Stroke="#A57744" StrokeThickness="1.4" />
@@ -454,11 +455,20 @@
             <Button x:Name="PetPropDance" Width="34" Height="34" Margin="2,0,2,0"
                     Padding="0" Cursor="Hand" ToolTip="点一下，跳支舞"
                     Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+                    MouseEnter="PetPropDance_MouseEnter"
                     Click="PetPropDance_Click">
                 <TextBlock Text="♫" Foreground="#7555A4" FontSize="23"
                            FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
             </Button>
           </StackPanel>
+          <Border x:Name="PetChoicePanel" Visibility="Collapsed" Padding="6" CornerRadius="10"
+                  Background="#F9F3FF" BorderBrush="#B8A6DE" BorderThickness="1"
+                  MouseEnter="PetChoicePanel_MouseEnter" MouseLeave="PetChoicePanel_MouseLeave">
+            <StackPanel>
+              <TextBlock x:Name="PetChoiceTitle" FontSize="11" Foreground="#74569F" Margin="3,0,3,4" />
+              <StackPanel x:Name="PetChoiceItems" />
+            </StackPanel>
+          </Border>
         </Canvas>
 
         <Canvas x:Name="TreatLayer" Panel.ZIndex="12" Visibility="Collapsed">

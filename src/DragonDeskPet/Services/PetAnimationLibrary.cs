@@ -31,12 +31,17 @@ public sealed class PetAnimationLibrary
         if (_failed.Contains(id) || !_clips.TryGetValue(id, out var clip)) return null;
         try
         {
+            // A finite dance can revisit a pose without decoding the same PNG
+            // for every beat in its timeline.
+            var decoded = new Dictionary<string, BitmapSource>(StringComparer.OrdinalIgnoreCase);
             var frames = clip.Frames.Select(path =>
             {
+                if (decoded.TryGetValue(path, out var existing)) return existing;
                 var bitmap = new BitmapImage(); bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad; bitmap.DecodePixelHeight = 512;
                 bitmap.UriSource = new Uri(Path.GetFullPath(Path.Combine(_directory, path)));
-                bitmap.EndInit(); bitmap.Freeze(); return (BitmapSource)bitmap;
+                bitmap.EndInit(); bitmap.Freeze();
+                return decoded[path] = bitmap;
             }).ToArray();
             if (frames.Any(f => f.PixelWidth != frames[0].PixelWidth || f.PixelHeight != frames[0].PixelHeight))
                 throw new InvalidDataException("Animation frames must share one canvas.");

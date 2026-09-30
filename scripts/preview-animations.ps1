@@ -1,4 +1,7 @@
-param([string]$OutputPath = 'dist/pet-interactions-v2-check/preview.html')
+param(
+    [string]$OutputPath = 'dist/pet-interactions-v2-check/preview.html',
+    [switch]$VariantOnly
+)
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -50,7 +53,7 @@ async function play(id, sequence){
   if(own===token){frame(id==='Hover' ? 'Hover/03.png' : id==='Sleep' ? 'Sleep/00.png' : 'Blink/00.png'); if(id!=='Sleep')mood(id==='Hover'?'curious':'normal'); status.textContent='';}
 }
 actions.forEach((id,i)=>{
-  const b=document.createElement('button');b.textContent=labels[i];b.onclick=()=>play(id);
+  const b=document.createElement('button');b.textContent=labels[i];b.onclick=()=>{void play(id)};
   document.getElementById('buttons').appendChild(b);
 });
 document.getElementById('all').onclick=async()=>{
@@ -62,5 +65,14 @@ document.getElementById('showGuide').onchange=e=>document.getElementById('stage'
 mood('normal');frame('Blink/00.png');
 </script></html>
 '@
+if ($VariantOnly) {
+    $html = $html.Replace('DragonDeskPet 动作预览', 'DragonDeskPet 点心与舞蹈预览')
+    $html = $html.Replace(
+        "const actions = ['Hover','Greet','Pet','Feed','Cuddle','Hop','Dance','Stretch','LookAround','Land','Sleep','Wake','Celebrate'];",
+        "const actions = ['FeedCookie','FeedStrawberry','FeedCake','FeedCandy','FeedCottonCandy','DanceStep','DanceGuofeng','DanceWingTail'];")
+    $html = $html -replace 'const labels = \[[^\r\n]*\];',
+        "const labels = ['饼干','草莓','蛋糕','糖果','棉花糖','轻快踏步','国风轻舞','翼尾合拍'];"
+    $html = $html.Replace('连续播放全部互动', '连续播放八种新互动')
+}
 [IO.File]::WriteAllText($output, $html.Replace('__CLIPS__', $clips), [Text.UTF8Encoding]::new($false))
 Write-Host $output

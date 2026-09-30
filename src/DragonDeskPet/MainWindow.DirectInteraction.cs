@@ -1,11 +1,18 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using DragonDeskPet.Core;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
+using Button = System.Windows.Controls.Button;
+using Orientation = System.Windows.Controls.Orientation;
+using Size = System.Windows.Size;
+using Cursors = System.Windows.Input.Cursors;
+using FontFamily = System.Windows.Media.FontFamily;
+using Color = System.Windows.Media.Color;
 
 namespace DragonDeskPet;
 
@@ -15,6 +22,9 @@ public partial class MainWindow
     private NativePoint? _lastStrokeCursor;
     private bool _feeding;
     private bool _draggingTreat;
+    private PetSnack _selectedSnack = PetSnack.Cookie;
+    private enum PetChoiceKind { Snacks, Dances }
+    private PetChoiceKind? _choiceKind;
     private readonly DispatcherTimer _propHideTimer = new() { Interval = TimeSpan.FromMilliseconds(350) };
 
     private bool CanShowPetProps => IsVisible && !_closing && !_isFullscreenActive && !_settingsOpen
@@ -47,12 +57,17 @@ public partial class MainWindow
     private void SchedulePetPropsHide()
     {
         if (PetPropLayer.Visibility == Visibility.Visible && !_propHideTimer.IsEnabled)
+        {
+            _propHideTimer.Interval = TimeSpan.FromMilliseconds(350);
             _propHideTimer.Start();
+        }
     }
 
     private void HidePetProps()
     {
         _propHideTimer.Stop();
+        PetChoicePanel.Visibility = Visibility.Collapsed;
+        _choiceKind = null;
         PetPropLayer.Visibility = Visibility.Collapsed;
     }
 
@@ -60,14 +75,110 @@ public partial class MainWindow
 
     private void PetPropBar_MouseLeave(object sender, MouseEventArgs e) => SchedulePetPropsHide();
 
-    private void PetPropSnack_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void PetPropSnack_MouseEnter(object sender, MouseEventArgs e) => ShowPetChoices(PetChoiceKind.Snacks);
+    private void PetPropDance_MouseEnter(object sender, MouseEventArgs e) => ShowPetChoices(PetChoiceKind.Dances);
+    private void PetChoicePanel_MouseEnter(object sender, MouseEventArgs e) => _propHideTimer.Stop();
+    private void PetChoicePanel_MouseLeave(object sender, MouseEventArgs e) => SchedulePetPropsHide();
+
+    private void ShowPetChoicesFromMenu(PetChoiceKind kind)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!CanShowPetProps) return;
+            ShowPetProps();
+            ShowPetChoices(kind);
+            // The pointer starts on the context menu, not on the pet props.
+            _propHideTimer.Interval = TimeSpan.FromMilliseconds(2200);
+            _propHideTimer.Start();
+        }, DispatcherPriority.ContextIdle);
+    }
+
+    private void ShowPetChoices(PetChoiceKind kind)
+    {
+        if (!CanShowPetProps) return;
+        _propHideTimer.Stop();
+        _propHideTimer.Interval = TimeSpan.FromMilliseconds(350);
+        ConfigurePetChoices(kind);
+        PetChoicePanel.Visibility = Visibility.Visible;
+        PositionPetChoices(kind);
+    }
+
+    private void ConfigurePetChoices(PetChoiceKind kind)
+    {
+        if (_choiceKind != kind)
+        {
+            PetChoiceItems.Children.Clear();
+            _choiceKind = kind;
+            PetChoicePanel.Width = kind == PetChoiceKind.Snacks ? 194 : 140;
+            PetChoicePanel.Height = kind == PetChoiceKind.Snacks ? 64 : 130;
+            PetChoiceTitle.Text = kind == PetChoiceKind.Snacks ? "选一种点心" : "选一支舞";
+            PetChoiceItems.Orientation = kind == PetChoiceKind.Snacks ? Orientation.Horizontal : Orientation.Vertical;
+            if (kind == PetChoiceKind.Snacks)
+            {
+                foreach (var snack in PetInteractionVariants.Snacks)
+                {
+                    var button = ChoiceButton(PetInteractionVariants.Glyph(snack), PetInteractionVariants.Name(snack), 34);
+                    button.Tag = snack;
+                    button.PreviewMouseLeftButtonDown += PetSnackChoice_PreviewMouseLeftButtonDown;
+                    PetChoiceItems.Children.Add(button);
+                }
+            }
+            else
+            {
+                foreach (var dance in PetInteractionVariants.Dances)
+                {
+                    var button = ChoiceButton("♫  " + PetInteractionVariants.Name(dance), PetInteractionVariants.Name(dance), 124);
+                    button.Tag = dance;
+                    button.Click += PetDanceChoice_Click;
+                    PetChoiceItems.Children.Add(button);
+                }
+            }
+        }
+    }
+
+    private void PositionPetChoices(PetChoiceKind kind)
+    {
+        PetChoicePanel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var width = PetChoicePanel.Width;
+        var height = PetChoicePanel.Height;
+        var propsLeft = Canvas.GetLeft(PetPropBar);
+        var propsTop = Canvas.GetTop(PetPropBar);
+        Canvas.SetLeft(PetChoicePanel, Math.Clamp(propsLeft - width - 5, 4, Math.Max(4, RootSurface.ActualWidth - width - 4)));
+        Canvas.SetTop(PetChoicePanel, Math.Clamp(propsTop + (kind == PetChoiceKind.Snacks ? 0 : 20),
+            4, Math.Max(4, RootSurface.ActualHeight - height - 4)));
+    }
+
+    private static Button ChoiceButton(string caption, string tooltip, double width) => new()
+    {
+        Width = width, Height = 31, Margin = new Thickness(1), Padding = new Thickness(0),
+        Content = caption, ToolTip = tooltip, Cursor = Cursors.Hand,
+        FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = width < 40 ? 17 : 12,
+        Background = new SolidColorBrush(Color.FromRgb(255, 250, 255)),
+        BorderBrush = new SolidColorBrush(Color.FromRgb(184, 166, 222)), BorderThickness = new Thickness(1)
+    };
+
+    private void PetSnackChoice_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+        if (sender is Button { Tag: PetSnack snack }) BeginTreatDrag(snack, e.GetPosition(TreatLayer));
+    }
+
+    private void PetDanceChoice_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not Button { Tag: PetDance dance } || !CanShowPetProps) return;
+        HidePetProps();
+        PlayPetActivity(PetActivity.Dance, clipId: PetInteractionVariants.ClipId(dance),
+            caption: PetInteractionVariants.Caption(dance));
+    }
+
+    private void BeginTreatDrag(PetSnack snack, Point position)
+    {
         if (!CanShowPetProps) { HidePetProps(); return; }
         HidePetProps();
-        ShowTreat();
+        ShowTreat(snack);
         if (!_feeding) return;
-        SetTreatPosition(e.GetPosition(TreatLayer));
+        SetTreatPosition(position);
         _draggingTreat = TreatToken.CaptureMouse();
         if (!_draggingTreat)
         {
@@ -76,12 +187,19 @@ public partial class MainWindow
         }
     }
 
+    private void PetPropSnack_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        BeginTreatDrag(PetSnack.Cookie, e.GetPosition(TreatLayer));
+    }
+
     private void PetPropDance_Click(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (!CanShowPetProps) { HidePetProps(); return; }
         HidePetProps();
-        PlayPetActivity(PetActivity.Dance);
+        PlayPetActivity(PetActivity.Dance, clipId: PetInteractionVariants.ClipId(PetDance.Step),
+            caption: PetInteractionVariants.Caption(PetDance.Step));
     }
 
     private bool TryGetArtworkRect(out Rect rect)
@@ -117,7 +235,7 @@ public partial class MainWindow
         return CharacterImage.TranslatePoint(new Point(art.X + art.Width * .50, art.Y + art.Height * .43), TreatLayer);
     }
 
-    private void ShowTreat()
+    private void ShowTreat(PetSnack snack = PetSnack.Cookie)
     {
         if (!PetCanInteract) return;
         HidePetProps();
@@ -127,12 +245,26 @@ public partial class MainWindow
         if (_stateMachine.Current is not (PetState.Idle or PetState.Hover))
             _stateMachine.TransitionTo(PetState.Idle);
         ApplyStateVisual(_stateMachine.Current);
+        _selectedSnack = snack;
         _feeding = true;
+        TreatToken.Background = new SolidColorBrush(snack switch
+        {
+            PetSnack.Strawberry => Color.FromRgb(255, 223, 229),
+            PetSnack.Cake => Color.FromRgb(255, 239, 219),
+            PetSnack.Candy => Color.FromRgb(239, 224, 255),
+            PetSnack.CottonCandy => Color.FromRgb(255, 226, 244),
+            _ => Color.FromRgb(229, 186, 123)
+        });
+        TreatToken.Child = new TextBlock { Text = PetInteractionVariants.Glyph(snack),
+            FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = 20,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            IsHitTestVisible = false };
         TreatLayer.Visibility = Visibility.Visible;
         var mouth = MouthPoint();
         Canvas.SetLeft(TreatTarget, mouth.X - 20); Canvas.SetTop(TreatTarget, mouth.Y - 20);
         SetTreatPosition(new Point(mouth.X - 66, mouth.Y + 38));
-        StateText.Text = "把点心拖到嘴边～";
+        StateText.Text = $"把{PetInteractionVariants.Name(snack)}拖到嘴边～";
         TreatToken.Focus();
     }
 
@@ -163,9 +295,11 @@ public partial class MainWindow
         var point = e.GetPosition(TreatLayer);
         var accepted = PetTreatDrop.IsAccepted(_feeding, _draggingTreat, PetCanInteract,
             (point - MouthPoint()).Length, _app.Settings.Scale);
+        var snack = _selectedSnack;
         CancelTreat();
         ApplyStateVisual(_stateMachine.Current);
-        if (accepted) PlayPetActivity(PetActivity.Feed);
+        if (accepted) PlayPetActivity(PetActivity.Feed, clipId: PetInteractionVariants.ClipId(snack),
+            caption: PetInteractionVariants.Caption(snack));
     }
 
     private void Treat_LostCapture(object sender, MouseEventArgs e)
@@ -182,6 +316,7 @@ public partial class MainWindow
     private void CancelTreat()
     {
         _feeding = false; _draggingTreat = false;
+        _selectedSnack = PetSnack.Cookie;
         if (Mouse.Captured == TreatToken) TreatToken.ReleaseMouseCapture();
         TreatLayer.Visibility = Visibility.Collapsed;
     }

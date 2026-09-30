@@ -1,5 +1,22 @@
 # 动作素材制作提示
 
+## interactions.11 点心与舞蹈
+
+使用内置 imagegen，以原角色图和已有完整互动帧为参考。共同提示：同一 Q 版龙娘，白紫长发、双角、紫眼、白紫裙、两只完整龙翼和龙尾；透明背景；2×2 四个完整角色姿势，四周留安全边距、比例与脚底基准一致；只改变指定表情、手脚或尾尖，不让身体横向钟摆旋转；不要文字、场景或额外人物。按动作分别提示：
+
+| 源素材 | 四个关键姿势 |
+|---|---|
+| `FeedCookie` | 看到饼干、伸手接、双手举到嘴边、闭眼咀嚼 |
+| `FeedStrawberry` | 好奇、双手迎接草莓、送到嘴边、开心眯眼 |
+| `FeedCake` | 惊喜、接蛋糕、小口品尝、满足微笑 |
+| `FeedCandy` | 期待、捧糖果、放入口中、甜蜜眨眼 |
+| `FeedCottonCandy` | 捧棉花糖、靠近脸颊、轻尝、闭眼微笑 |
+| `DanceStepA/B` | 起势、交替小踏步、手臂摆动、举手亮相和回站 |
+| `DanceGuofengA/B` | 缓慢抬手、转腕、轻转步、垂眸、合手收势；只借鉴国风感觉 |
+| `DanceWingTailA/B` | 双手带节奏、尾尖配合、转步、回站；另用完整单帧 `DanceWingTailOpen` 表现一次适度张翅 |
+
+第一版草莓 3×2 源图碰到切分线，已弃用；全部最终源图位于 `assets/character/animations/sources/v11/`。`scripts/import-interaction-variants.py` 拒绝碰切分线的格子、去掉离散杂点，按头部和脚底锚点导出完整 512×512 透明帧，并登记五种投喂与三支 8 秒舞蹈。张翅动作使用独立单帧，源图不进入运行包。使用这些素材时继续目视检查头发、翼根、尾巴和衣摆在相邻姿势间的连续性；不能仅凭几何检查宣称连续动作完全流畅。
+
 内置 imagegen 以 `references/character-original.jpg`、`references/chibi-animation-reference.jpg`、既有运行时状态图为视觉参考，先生成 `assets/character/animations/sources/pose-overview.png`，再分别生成 `sources/` 下 14 张透明 3×2 姿势图。每张图的六格均要求同一角色、同一比例、同一脚底锚点；保留白紫长发、双角、紫眼、龙翼、龙尾与白紫裙装。非跳跃动作仅改变指定部位，不平移或旋转整身；无背景、文字、边框或独立道具。运行时文件由 `scripts/import-animation-sheets.ps1` 切帧生成，原状态图保持不变。
 
 | 源图 | 六格主要动作提示 |

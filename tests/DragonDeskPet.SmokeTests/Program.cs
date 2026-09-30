@@ -34,6 +34,8 @@ if (args is ["--ocr-sample", var imagePath])
 }
 if (args is ["--render-ui", var renderDirectory]) return CourseLayoutChecks.Render(renderDirectory);
 if (args is ["--test-pet-interactions", var petRenderDirectory]) return PetInteractionTests.Run(petRenderDirectory);
+if (args is ["--test-interaction-variants", var variantRenderDirectory])
+    return PetInteractionTests.RunVariants(variantRenderDirectory);
 if (args is ["--probe-school-navigation"]) return SchoolNavigationProbe.Run();
 if (args is ["--test-school-redirect"]) return SchoolNavigationProbe.Run(syntheticRedirect: true);
 if (args is ["--course-sample", var samplePath])
