@@ -582,7 +582,8 @@ public partial class MainWindow : Window
 
         if (cloudPress)
         {
-            if (_stateMachine.Current is PetState.Idle or PetState.Hover
+            if ((_stateMachine.Current is PetState.Idle or PetState.Hover
+                    || _stateMachine.Current == PetState.Happy && _activePetActivity is not null)
                 && !_isBusy && !_feeding
                 && _companionTapCooldown.TryAccept(DateTimeOffset.UtcNow))
             {

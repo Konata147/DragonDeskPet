@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -23,6 +24,7 @@ internal static class PetInteractionTests
                 Directory.CreateDirectory(directory);
                 CheckVariantArtwork();
                 CheckVariantPlayback();
+                CheckCompanionVariantReactions();
                 RenderVariantChoices(directory);
             }
             catch (Exception ex) { failure = ex; }
@@ -161,6 +163,112 @@ internal static class PetInteractionTests
         Console.WriteLine("PASS: selected dance replacement, one-shot completion, static mode and stop.");
     }
 
+    private static void CheckCompanionVariantReactions()
+    {
+        var image = new WpfImage { Width = 18, Height = 15 };
+        var scale = new ScaleTransform(); var rotate = new RotateTransform(); var translate = new TranslateTransform();
+        var animator = new PetCompanionAnimator(image, scale, rotate, translate);
+        var original = new BitmapImage(new Uri(Path.Combine(AssetService.CharacterDirectory, "default.png")));
+        animator.LoadSources(original, original, original, original, original);
+        var type = typeof(PetCompanionAnimator);
+        var moodType = type.GetNestedType("Mood", BindingFlags.NonPublic)!;
+        BitmapSource? Face(string name) => (BitmapSource?)type.GetMethod("Face", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(animator, [Enum.Parse(moodType, name)]);
+        object Field(string name) => type.GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(animator)!;
+        void Advance(DispatcherTimer timer, long revision, long elapsed) =>
+            type.GetMethod("AdvanceReaction", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(animator, [timer, revision, elapsed]);
+        var signatures = new HashSet<string>();
+        foreach (var snack in PetInteractionVariants.Snacks)
+        {
+            animator.SetState(PetState.Happy, false, true);
+            animator.ReactSnack(snack, 1630);
+            var timer = (DispatcherTimer)Field("_reactionTimer");
+            var revision = (long)Field("_revision");
+            var faces = ((Array)Field("_reactionFaces")).Cast<ITuple>()
+                .Select(cue => $"{cue[0]}:{cue[1]}");
+            var motion = ((Array)Field("_reactionMotion")).Cast<ITuple>()
+                .Select(cue => $"{cue[0]}:{cue[1]}").ToArray();
+            Require(signatures.Add(string.Join("/", faces) + "|" + string.Join("/", motion)),
+                $"The {snack} cloud reaction repeats another snack.");
+            Require(timer.IsEnabled && (int)Field("_reactionDurationMs") == 1630
+                && translate.HasAnimatedProperties && !rotate.HasAnimatedProperties && !scale.HasAnimatedProperties
+                && ((Array)Field("_reactionMotion")).Cast<ITuple>()
+                    .All(cue => Math.Abs((double)cue[1]!) <= 3),
+                $"The {snack} cloud reaction changes size, rotates, or exceeds its small vertical range.");
+            Advance(timer, revision, 1630);
+            Require(!timer.IsEnabled && ReferenceEquals(image.Source, Face("Normal"))
+                && !translate.HasAnimatedProperties, $"The {snack} reaction did not settle.");
+        }
+        foreach (var dance in PetInteractionVariants.Dances)
+        {
+            animator.SetState(PetState.Happy, false, true);
+            animator.ReactDance(dance, 8000);
+            var timer = (DispatcherTimer)Field("_reactionTimer");
+            var revision = (long)Field("_revision");
+            var faces = ((Array)Field("_reactionFaces")).Cast<ITuple>()
+                .Select(cue => $"{cue[0]}:{cue[1]}");
+            var motion = ((Array)Field("_reactionMotion")).Cast<ITuple>()
+                .Select(cue => $"{cue[0]}:{cue[1]}").ToArray();
+            Require(signatures.Add(string.Join("/", faces) + "|" + string.Join("/", motion)),
+                $"The {dance} cloud dance repeats another reaction.");
+            Require(timer.IsEnabled && (int)Field("_reactionDurationMs") == 8000
+                && translate.HasAnimatedProperties && !rotate.HasAnimatedProperties && !scale.HasAnimatedProperties
+                && ((Array)Field("_reactionMotion")).Cast<ITuple>()
+                    .All(cue => Math.Abs((double)cue[1]!) <= 3),
+                $"The {dance} cloud dance changes size, rotates, or exceeds its small vertical range.");
+            if (dance == PetDance.WingTail)
+            {
+                Require(ReferenceEquals(image.Source, Face("Curious")), "Wing-tail cloud did not begin curious.");
+                Advance(timer, revision, 5859);
+                Require(ReferenceEquals(image.Source, Face("Curious")), "Wing-tail cloud anticipated the wing opening.");
+                Advance(timer, revision, 5860);
+                Require(ReferenceEquals(image.Source, Face("Happy")), "Wing-tail cloud missed the wing opening.");
+            }
+            Advance(timer, revision, 8000);
+            Require(!timer.IsEnabled && ReferenceEquals(image.Source, Face("Normal"))
+                && !translate.HasAnimatedProperties, $"The {dance} cloud dance did not settle.");
+        }
+        animator.SetState(PetState.Happy, false, true);
+        animator.ReactDance(PetDance.Step, 8000);
+        var oldTimer = (DispatcherTimer)Field("_reactionTimer");
+        var oldRevision = (long)Field("_revision");
+        animator.ReactDance(PetDance.WingTail, 8000);
+        var currentTimer = (DispatcherTimer)Field("_reactionTimer");
+        var currentRevision = (long)Field("_revision");
+        Advance(oldTimer, oldRevision, 8000);
+        Require(!oldTimer.IsEnabled && currentTimer.IsEnabled
+            && ReferenceEquals(image.Source, Face("Curious")),
+            "An interrupted companion callback replaced the new dance.");
+        animator.Tap();
+        var tapTimer = (DispatcherTimer)Field("_tapTimer");
+        Require(!currentTimer.IsEnabled && tapTimer.IsEnabled
+            && ReferenceEquals(image.Source, Face("Happy")),
+            "Tapping the cloud did not interrupt its dance independently.");
+        Advance(currentTimer, currentRevision, 8000);
+        Require(tapTimer.IsEnabled && ReferenceEquals(image.Source, Face("Happy")),
+            "An old dance callback overrode the cloud tap.");
+        animator.SetState(PetState.Sleeping, false, false);
+        Require(!tapTimer.IsEnabled && image.Visibility == Visibility.Collapsed,
+            "The cloud remained visible over sleeping artwork.");
+        animator.SetState(PetState.Happy, true, true);
+        animator.ReactSnack(PetSnack.Strawberry, 1630);
+        Require(type.GetField("_reactionTimer", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(animator) is null
+            && !translate.HasAnimatedProperties && ReferenceEquals(image.Source, Face("Curious")),
+            "Reduced motion did not keep a static snack expression.");
+        animator.SetState(PetState.Happy, true, true);
+        animator.ReactDance(PetDance.Guofeng, 8000);
+        Require(type.GetField("_reactionTimer", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(animator) is null
+            && !translate.HasAnimatedProperties && ReferenceEquals(image.Source, Face("Thinking")),
+            "Reduced motion did not keep a static companion expression.");
+        animator.Suspend();
+        Require(image.Visibility == Visibility.Collapsed,
+            "Hiding did not stop the companion reaction.");
+        Console.WriteLine("PASS: eight distinct companion reactions, wing sync, interruption, sleep and static mode.");
+    }
+
     private static void RenderVariantChoices(string directory)
     {
         var app = new App(); app.InitializeComponent();
@@ -209,6 +317,28 @@ internal static class PetInteractionTests
                 }
                 Save(root, 830, 590, Path.Combine(directory, $"{name.ToLowerInvariant()}-scale-{scale:0.0}.png"));
             }
+            Invoke(window, "HidePetProps");
+            var cloud = (WpfImage)window.FindName("AiCompanion");
+            var character = (WpfImage)window.FindName("CharacterImage");
+            var animator = (PetCompanionAnimator)typeof(MainWindow)
+                .GetField("_companionAnimator", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(window)!;
+            var dance = new PetAnimationLibrary(Path.Combine(AppContext.BaseDirectory,
+                "assets", "character", "animations")).Load("DanceWingTail")!;
+            character.Source = dance.Frames[dance.Clip.PosterFrame];
+            animator.SetState(PetState.Happy, false, true);
+            animator.ReactDance(PetDance.WingTail, 8000);
+            root.UpdateLayout();
+            var cloudBounds = cloud.TransformToAncestor(root).TransformBounds(new Rect(cloud.RenderSize));
+            Save(root, 830, 590, Path.Combine(directory, $"companion-dance-scale-{scale:0.0}.png"));
+            // The constrained offscreen host may compress its arranged height slightly at 200%.
+            // The logical cloud size must stay fixed; the rendered cloud must remain in bounds.
+            Require(cloud.Visibility == Visibility.Visible && cloud.Width == 18 && cloud.Height == 15
+                && Math.Abs(cloudBounds.Width - 18 * scale) < 1
+                && Math.Abs(cloudBounds.Height - 15 * scale) < 2
+                && cloudBounds.Left >= 0 && cloudBounds.Top >= 0
+                && cloudBounds.Right <= 830 && cloudBounds.Bottom <= 590,
+                $"The dancing companion changed size or escaped the window at {scale:P0}: {cloudBounds}.");
+            animator.Suspend();
         }
         Invoke(window, "HidePetProps");
         Require(panel.Visibility == Visibility.Collapsed && layer.Visibility == Visibility.Collapsed,

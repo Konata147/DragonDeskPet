@@ -168,8 +168,7 @@ public partial class MainWindow
         e.Handled = true;
         if (sender is not Button { Tag: PetDance dance } || !CanShowPetProps) return;
         HidePetProps();
-        PlayPetActivity(PetActivity.Dance, clipId: PetInteractionVariants.ClipId(dance),
-            caption: PetInteractionVariants.Caption(dance));
+        PlayPetActivity(PetActivity.Dance, dance: dance);
     }
 
     private void BeginTreatDrag(PetSnack snack, Point position)
@@ -198,8 +197,7 @@ public partial class MainWindow
         e.Handled = true;
         if (!CanShowPetProps) { HidePetProps(); return; }
         HidePetProps();
-        PlayPetActivity(PetActivity.Dance, clipId: PetInteractionVariants.ClipId(PetDance.Step),
-            caption: PetInteractionVariants.Caption(PetDance.Step));
+        PlayPetActivity(PetActivity.Dance, dance: PetDance.Step);
     }
 
     private bool TryGetArtworkRect(out Rect rect)
@@ -298,8 +296,7 @@ public partial class MainWindow
         var snack = _selectedSnack;
         CancelTreat();
         ApplyStateVisual(_stateMachine.Current);
-        if (accepted) PlayPetActivity(PetActivity.Feed, clipId: PetInteractionVariants.ClipId(snack),
-            caption: PetInteractionVariants.Caption(snack));
+        if (accepted) PlayPetActivity(PetActivity.Feed, snack: snack);
     }
 
     private void Treat_LostCapture(object sender, MouseEventArgs e)

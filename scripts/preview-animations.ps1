@@ -30,13 +30,33 @@ const labels = ['指向时“嗯？”','打招呼','摸摸头','喂点心','贴
 const prefix = '../../assets/character/animations/';
 const cloudPrefix = '../../assets/character/companion/';
 const pet = document.getElementById('pet'), companion = document.getElementById('companion'), status = document.getElementById('status');
-let token = 0;
+let token = 0, reactionSerial = 0;
 function mood(name){companion.style.backgroundImage=`url('${cloudPrefix+name}.png')`;companion.dataset.mood=name}
 function frame(path){pet.src=prefix+path;companion.style.display=path.startsWith('Sleep/')||path==='Wake/00.png'?'none':''}
-function react(id){
+function react(id, durationMs){
+  const serial = ++reactionSerial;
+  companion.getAnimations().forEach(a=>a.cancel());
+  const variants = {
+    FeedCookie:{faces:[[0,'curious'],[550,'happy']],motion:[[0,0],[550,-2],[1200,0],[1630,0]],base:1630},
+    FeedStrawberry:{faces:[[0,'curious'],[450,'blink'],[700,'happy']],motion:[[0,0],[450,0],[850,-3],[1350,0],[1630,0]],base:1630},
+    FeedCake:{faces:[[0,'happy'],[900,'blink'],[1100,'happy']],motion:[[0,0],[280,-2],[700,-2],[1500,0],[1630,0]],base:1630},
+    FeedCandy:{faces:[[0,'curious'],[350,'happy']],motion:[[0,0],[850,-2],[1250,0],[1630,0]],base:1630},
+    FeedCottonCandy:{faces:[[0,'thinking'],[600,'blink'],[950,'happy']],motion:[[0,0],[600,0],[1100,-2],[1500,0],[1630,0]],base:1630},
+    DanceStep:{faces:[[0,'happy'],[4000,'blink'],[4200,'happy']],motion:[[0,0],[800,-2],[1200,0],[3000,-2],[3400,0],[5400,-2],[5800,0],[8000,0]],base:8000},
+    DanceGuofeng:{faces:[[0,'thinking'],[4000,'happy']],motion:[[0,0],[1200,0],[3000,-2],[5200,-2],[7400,0],[8000,0]],base:8000},
+    DanceWingTail:{faces:[[0,'curious'],[5860,'happy']],motion:[[0,0],[5600,0],[6200,-3],[6800,0],[8000,0]],base:8000}
+  };
+  const variant = variants[id];
+  if(variant){
+    mood(variant.faces[0][1]);
+    for(const [time, face] of variant.faces.slice(1))
+      setTimeout(()=>{if(serial===reactionSerial)mood(face)},Math.round(time*durationMs/variant.base));
+    companion.animate(variant.motion.map(([time,y])=>({offset:time/variant.base,transform:`translateY(${y}px)`})),
+      {duration:durationMs,easing:'ease-in-out'});
+    return;
+  }
   const face = ({Hover:'curious',Pet:'blink',Feed:'curious',Hop:'curious',Stretch:'thinking',LookAround:'curious',Land:'curious',Wake:'curious'})[id]||'happy';
   mood(face);
-  companion.getAnimations().forEach(a=>a.cancel());
   const poses = ({Greet:[0,-7,0,-7,0],Pet:[0,3,0],Feed:[0,4,-6,0],Cuddle:[0,-3,0],Hop:[0,-5,-15,-7,0],Dance:[0,-4,0,-4,0],Stretch:[0,-4,0],LookAround:[0,-3,0],Land:[0,4,0],Wake:[0,-7,0],Celebrate:[0,-9,0,-9,0],Hover:[0,-4,0]})[id];
   if(poses) companion.animate(poses.map(y=>({transform:`translateY(${y}px)`})),{duration:id==='Hop'?1250:750,easing:'ease-in-out'});
 }
@@ -45,12 +65,13 @@ async function play(id, sequence){
   const clip=byId[id]; if(!clip)return;
   const own=sequence ?? ++token;
   status.textContent=document.getElementById('showLabel').checked ? id : '';
-  react(id);
+  const durationMs=clip.DurationsMs.reduce((total,ms)=>total+ms,0);
+  react(id,durationMs);
   for(let i=0;i<clip.Frames.length;i++){
     if(own!==token)return;
     frame(clip.Frames[i]); await delay(clip.DurationsMs[i]);
   }
-  if(own===token){frame(id==='Hover' ? 'Hover/03.png' : id==='Sleep' ? 'Sleep/00.png' : 'Blink/00.png'); if(id!=='Sleep')mood(id==='Hover'?'curious':'normal'); status.textContent='';}
+  if(own===token){++reactionSerial;companion.getAnimations().forEach(a=>a.cancel());frame(id==='Hover' ? 'Hover/03.png' : id==='Sleep' ? 'Sleep/00.png' : 'Blink/00.png'); if(id!=='Sleep')mood(id==='Hover'?'curious':'normal'); status.textContent='';}
 }
 actions.forEach((id,i)=>{
   const b=document.createElement('button');b.textContent=labels[i];b.onclick=()=>{void play(id)};

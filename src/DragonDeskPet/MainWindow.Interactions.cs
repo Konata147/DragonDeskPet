@@ -174,9 +174,13 @@ public partial class MainWindow
     }
 
     private void PlayPetActivity(PetActivity activity, bool automatic = false,
-        string? clipId = null, string? caption = null)
+        PetSnack? snack = null, PetDance? dance = null)
     {
         if (!PetCanInteract) return;
+        var clipId = snack is { } chosenSnack ? PetInteractionVariants.ClipId(chosenSnack)
+            : dance is { } chosenDance ? PetInteractionVariants.ClipId(chosenDance) : null;
+        var caption = snack is { } captionSnack ? PetInteractionVariants.Caption(captionSnack)
+            : dance is { } captionDance ? PetInteractionVariants.Caption(captionDance) : null;
         var now = DateTimeOffset.UtcNow;
         if (!automatic && now < _nextManualAction) return;
         if (!automatic)
@@ -196,7 +200,15 @@ public partial class MainWindow
         finally { _preserveCharacterImageForAction = false; }
         _activePetActivity = activity;
         StateText.Text = caption ?? info.Caption;
-        if (clip is not null) _companionAnimator.React(activity);
+        if (clip is not null)
+        {
+            if (snack is { } selectedSnack)
+                _companionAnimator.ReactSnack(selectedSnack, clip.Clip.DurationMs);
+            else if (dance is { } selectedDance)
+                _companionAnimator.ReactDance(selectedDance, clip.Clip.DurationMs);
+            else
+                _companionAnimator.React(activity);
+        }
         if (clip is null)
         {
             // A missing variant must stay still, never borrow a generic dance or sway.
