@@ -26,6 +26,7 @@ internal static class PetInteractionTests
                 CheckVariantPlayback();
                 CheckCompanionVariantReactions();
                 CheckCompanionInvitationSchedule();
+                CheckCompanionInvitationAcrossSleep();
                 RenderVariantChoices(directory);
             }
             catch (Exception ex) { failure = ex; }
@@ -316,6 +317,33 @@ internal static class PetInteractionTests
             && schedule.TryShow(start.AddMinutes(10), start, true, out var third)
             && third == PetCompanionInvitationKind.Snack,
             "Focus or another blocked state did not defer the next invitation.");
+    }
+
+    private static void CheckCompanionInvitationAcrossSleep()
+    {
+        var start = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var schedule = new PetCompanionInvitation(start);
+        var shown = new List<(int Second, PetCompanionInvitationKind Kind)>();
+        for (var second = 0; second <= 900; second++)
+        {
+            var now = start.AddSeconds(second);
+            var sleeping = second is >= 300 and < 600;
+            if (schedule.ShouldHide(now, !sleeping))
+                schedule.Hide(now, interrupted: sleeping);
+            if (sleeping)
+            {
+                schedule.Defer(now);
+                continue;
+            }
+            var lastInteraction = second >= 600 ? start.AddSeconds(600) : start;
+            if (schedule.TryShow(now, lastInteraction, true, out var kind))
+                shown.Add((second, kind));
+        }
+        Require(shown.SequenceEqual(new[] {
+            (120, PetCompanionInvitationKind.Snack),
+            (720, PetCompanionInvitationKind.Dance) }),
+            "Long idle, automatic sleep and wake caused an early or repeated invitation.");
+        Console.WriteLine("PASS: long idle offers once before sleep, stays quiet in sleep, and resumes after wake delay.");
     }
 
     private static void RenderVariantChoices(string directory)
