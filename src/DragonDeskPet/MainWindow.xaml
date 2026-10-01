@@ -15,6 +15,46 @@
         Closing="Window_Closing"
         LocationChanged="Window_LocationChanged">
     <Window.Resources>
+        <Style x:Key="PetPropButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="#FFFDFC" />
+            <Setter Property="BorderBrush" Value="#BDA7DF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="PropSurface"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="17">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#684B91" BlurRadius="5"
+                                                  ShadowDepth="1" Opacity="0.25" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="PropSurface" Property="Background" Value="#F0E6FF" />
+                                <Setter TargetName="PropSurface" Property="BorderBrush" Value="#8E6AC4" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="PropSurface" Property="Background" Value="#DDCDF5" />
+                                <Setter TargetName="PropSurface" Property="BorderBrush" Value="#7652AD" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="QuickIconButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="36" />
             <Setter Property="Height" Value="36" />
@@ -440,33 +480,51 @@
           <StackPanel x:Name="PetPropBar" Orientation="Vertical"
                       Width="38" Height="118" MouseEnter="PetPropBar_MouseEnter"
                       MouseLeave="PetPropBar_MouseLeave">
-            <Button x:Name="PetPropSnack" Width="34" Height="34" Margin="2,0,2,6"
-                    Padding="0" Cursor="Hand" ToolTip="拖到嘴边投喂"
-                    Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+            <Button x:Name="PetPropSnack" Style="{StaticResource PetPropButtonStyle}"
+                    Margin="2,0,2,6" ToolTip="拖到嘴边投喂"
                     MouseEnter="PetPropSnack_MouseEnter"
                     PreviewMouseLeftButtonDown="PetPropSnack_PreviewMouseLeftButtonDown">
-                <Grid Width="21" Height="21">
-                    <Ellipse Fill="#E5BA7B" Stroke="#A57744" StrokeThickness="1.4" />
-                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="-7,-6,0,0" />
-                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="6,-1,0,0" />
-                    <Ellipse Width="3" Height="3" Fill="#845C3C" Margin="-2,7,0,0" />
+                <Grid Width="22" Height="22">
+                    <Ellipse Margin="1" Stroke="#A87545" StrokeThickness="1.3">
+                        <Ellipse.Fill>
+                            <RadialGradientBrush GradientOrigin="0.35,0.28">
+                                <GradientStop Color="#FFE4AD" Offset="0" />
+                                <GradientStop Color="#D99C5F" Offset="1" />
+                            </RadialGradientBrush>
+                        </Ellipse.Fill>
+                    </Ellipse>
+                    <Ellipse Width="3.4" Height="3.4" Fill="#8F5D43" Margin="-7,-7,0,0" />
+                    <Ellipse Width="2.8" Height="2.8" Fill="#9B694B" Margin="7,-3,0,0" />
+                    <Ellipse Width="3.2" Height="3.2" Fill="#8F5D43" Margin="-1,8,0,0" />
+                    <Ellipse Width="1.8" Height="1.8" Fill="#B77C50" Margin="-10,4,0,0" />
                 </Grid>
             </Button>
-            <Button x:Name="PetPropDance" Width="34" Height="34" Margin="2,0,2,6"
-                    Padding="0" Cursor="Hand" ToolTip="点一下，跳支舞"
-                    Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+            <Button x:Name="PetPropDance" Style="{StaticResource PetPropButtonStyle}"
+                    Margin="2,0,2,6" ToolTip="点一下，跳支舞"
                     MouseEnter="PetPropDance_MouseEnter"
                     Click="PetPropDance_Click">
-                <TextBlock Text="♫" Foreground="#7555A4" FontSize="23"
-                           FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                <Grid Width="23" Height="23">
+                    <Path Data="M 9,5 L 18,3.5 L 18,15 M 9,5 L 9,18"
+                          Stroke="#7653AD" StrokeThickness="2.2"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round" />
+                    <Ellipse Width="6.2" Height="4.5" Fill="#7653AD"
+                             HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                             Margin="2.5,0,0,1.5" RenderTransform="0.95,0,-0.3,1,0,0" />
+                    <Ellipse Width="6.2" Height="4.5" Fill="#7653AD"
+                             HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                             Margin="0,0,2,4.5" RenderTransform="0.95,0,-0.3,1,0,0" />
+                </Grid>
             </Button>
-            <Button x:Name="PetPropHop" Width="34" Height="34" Margin="2,0,2,0"
-                    Padding="0" Cursor="Hand" ToolTip="点一下，蹦一蹦"
-                    Background="#F6F0FF" BorderBrush="#B8A6DE" BorderThickness="1"
+            <Button x:Name="PetPropHop" Style="{StaticResource PetPropButtonStyle}"
+                    Margin="2,0,2,0" ToolTip="点一下，蹦一蹦"
                     MouseEnter="PetPropHop_MouseEnter"
                     Click="PetPropHop_Click">
-                <TextBlock Text="✦" Foreground="#7555A4" FontSize="22"
-                           FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                <Grid Width="23" Height="23">
+                    <Path Data="M 11.5,1.5 C 12.6,7.2 15.7,10.4 21.5,11.5 C 15.7,12.6 12.6,15.8 11.5,21.5 C 10.4,15.8 7.3,12.6 1.5,11.5 C 7.3,10.4 10.4,7.2 11.5,1.5 Z"
+                          Fill="#8E6AC4" Stroke="#6F4CA6" StrokeThickness="0.6" />
+                    <Ellipse Width="2" Height="2" Fill="#FFF9FF" Margin="-2,-6,0,0" />
+                </Grid>
             </Button>
           </StackPanel>
           <Border x:Name="PetChoicePanel" Visibility="Collapsed" Padding="6" CornerRadius="10"
