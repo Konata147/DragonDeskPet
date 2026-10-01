@@ -124,7 +124,7 @@ public partial class MainWindow
             {
                 foreach (var snack in PetInteractionVariants.Snacks)
                 {
-                    var button = ChoiceButton(PetInteractionVariants.Glyph(snack), PetInteractionVariants.Name(snack), 34);
+                    var button = ChoiceButton(PetChoiceIcons.Snack(snack, 23), PetInteractionVariants.Name(snack), 34);
                     button.Tag = snack;
                     button.PreviewMouseLeftButtonDown += PetSnackChoice_PreviewMouseLeftButtonDown;
                     PetChoiceItems.Children.Add(button);
@@ -134,7 +134,14 @@ public partial class MainWindow
             {
                 foreach (var dance in PetInteractionVariants.Dances)
                 {
-                    var button = ChoiceButton("♫  " + PetInteractionVariants.Name(dance), PetInteractionVariants.Name(dance), 124);
+                    var content = new StackPanel { Orientation = Orientation.Horizontal,
+                        VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+                    content.Children.Add(PetChoiceIcons.Dance(dance, 19));
+                    content.Children.Add(new TextBlock { Text = PetInteractionVariants.Name(dance),
+                        Margin = new Thickness(6, 0, 0, 0), FontFamily = new FontFamily("Microsoft YaHei UI"),
+                        FontSize = 11.5, Foreground = new SolidColorBrush(Color.FromRgb(98, 76, 130)),
+                        VerticalAlignment = VerticalAlignment.Center });
+                    var button = ChoiceButton(content, PetInteractionVariants.Name(dance), 124);
                     button.Tag = dance;
                     button.Click += PetDanceChoice_Click;
                     PetChoiceItems.Children.Add(button);
@@ -155,13 +162,11 @@ public partial class MainWindow
             4, Math.Max(4, RootSurface.ActualHeight - height - 4)));
     }
 
-    private static Button ChoiceButton(string caption, string tooltip, double width) => new()
+    private Button ChoiceButton(FrameworkElement content, string tooltip, double width) => new()
     {
-        Width = width, Height = 31, Margin = new Thickness(1), Padding = new Thickness(0),
-        Content = caption, ToolTip = tooltip, Cursor = Cursors.Hand,
-        FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = width < 40 ? 17 : 12,
-        Background = new SolidColorBrush(Color.FromRgb(255, 250, 255)),
-        BorderBrush = new SolidColorBrush(Color.FromRgb(184, 166, 222)), BorderThickness = new Thickness(1)
+        Width = width, Height = 31, Margin = new Thickness(1),
+        Content = content, ToolTip = tooltip,
+        Style = (Style)FindResource("PetChoiceButtonStyle")
     };
 
     private void PetSnackChoice_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -260,25 +265,26 @@ public partial class MainWindow
         ApplyStateVisual(_stateMachine.Current);
         _selectedSnack = snack;
         _feeding = true;
-        TreatToken.Background = new SolidColorBrush(snack switch
-        {
-            PetSnack.Strawberry => Color.FromRgb(255, 223, 229),
-            PetSnack.Cake => Color.FromRgb(255, 239, 219),
-            PetSnack.Candy => Color.FromRgb(239, 224, 255),
-            PetSnack.CottonCandy => Color.FromRgb(255, 226, 244),
-            _ => Color.FromRgb(229, 186, 123)
-        });
-        TreatToken.Child = new TextBlock { Text = PetInteractionVariants.Glyph(snack),
-            FontFamily = new FontFamily("Segoe UI Emoji"), FontSize = 20,
-            HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
-            VerticalAlignment = System.Windows.VerticalAlignment.Center,
-            IsHitTestVisible = false };
+        SetTreatVisual(snack);
         TreatLayer.Visibility = Visibility.Visible;
         var mouth = MouthPoint();
         Canvas.SetLeft(TreatTarget, mouth.X - 20); Canvas.SetTop(TreatTarget, mouth.Y - 20);
         SetTreatPosition(new Point(mouth.X - 66, mouth.Y + 38));
         StateText.Text = $"把{PetInteractionVariants.Name(snack)}拖到嘴边～";
         TreatToken.Focus();
+    }
+
+    private void SetTreatVisual(PetSnack snack)
+    {
+        TreatToken.Background = new SolidColorBrush(snack switch
+        {
+            PetSnack.Strawberry => Color.FromRgb(255, 223, 229),
+            PetSnack.Cake => Color.FromRgb(255, 239, 219),
+            PetSnack.Candy => Color.FromRgb(239, 224, 255),
+            PetSnack.CottonCandy => Color.FromRgb(255, 226, 244),
+            _ => Color.FromRgb(255, 248, 236)
+        });
+        TreatToken.Child = PetChoiceIcons.Snack(snack, 25);
     }
 
     private void SetTreatPosition(Point point)

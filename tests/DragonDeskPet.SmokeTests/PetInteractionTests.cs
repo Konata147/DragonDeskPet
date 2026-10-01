@@ -292,6 +292,8 @@ internal static class PetInteractionTests
         var bar = (StackPanel)window.FindName("PetPropBar");
         var hopProp = (System.Windows.Controls.Button)window.FindName("PetPropHop");
         var items = (StackPanel)window.FindName("PetChoiceItems");
+        var token = (Border)window.FindName("TreatToken");
+        var treatLayer = (Canvas)window.FindName("TreatLayer");
         var kind = typeof(MainWindow).GetNestedType("PetChoiceKind", BindingFlags.NonPublic)!;
         foreach (var scale in new[] { .6, 1.0, 2.0 })
         {
@@ -309,6 +311,35 @@ internal static class PetInteractionTests
                 Invoke(window, "PositionPetChoices", choice);
                 root.UpdateLayout();
                 Require(items.Children.Count == count, $"Wrong number of {name} options.");
+                if (name == "Snacks")
+                {
+                    var icons = items.Children.Cast<System.Windows.Controls.Button>()
+                        .Select(button => button.Content as WpfImage).ToArray();
+                    Require(icons.All(icon => icon?.Source is DrawingImage)
+                        && icons.Select(icon => icon!.Source).Distinct().Count() == count,
+                        "The five snack choices do not have distinct vector drawings.");
+                    for (var i = 0; i < count; i++)
+                    {
+                        var snack = PetInteractionVariants.Snacks[i];
+                        Invoke(window, "SetTreatVisual", snack);
+                        Require(token.Child is WpfImage dragged && dragged.Source == icons[i]!.Source
+                            && dragged.Width == 25 && token.Width == 36 && token.Height == 36,
+                            $"The dragged {snack} does not match its choice icon.");
+                        if (scale == 1)
+                            Save(token, 36, 36, Path.Combine(directory, $"treat-{snack}.png"));
+                    }
+                    root.UpdateLayout();
+                }
+                else
+                {
+                    var rows = items.Children.Cast<System.Windows.Controls.Button>()
+                        .Select(button => button.Content as StackPanel).ToArray();
+                    Require(rows.All(row => row?.Children.Count == 2
+                        && row.Children[0] is WpfImage { Source: DrawingImage }
+                        && row.Children[1] is TextBlock label && !string.IsNullOrWhiteSpace(label.Text))
+                        && rows.Select(row => ((WpfImage)row!.Children[0]).Source).Distinct().Count() == count,
+                        "The three dances do not have distinct vector icons and readable names.");
+                }
                 var bounds = panel.TransformToAncestor(root).TransformBounds(new Rect(panel.RenderSize));
                 var barBounds = bar.TransformToAncestor(root).TransformBounds(new Rect(bar.RenderSize));
                 Require(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 830 && bounds.Bottom <= 590,
@@ -337,6 +368,23 @@ internal static class PetInteractionTests
                 Save(root, 830, 590, Path.Combine(directory, $"{name.ToLowerInvariant()}-scale-{scale:0.0}.png"));
             }
             Invoke(window, "HidePetProps");
+            Invoke(window, "SetTreatVisual", PetSnack.CottonCandy);
+            var mouth = (System.Windows.Point)typeof(MainWindow).GetMethod("MouthPoint",
+                BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null)!;
+            var target = (System.Windows.Shapes.Ellipse)window.FindName("TreatTarget");
+            Canvas.SetLeft(target, mouth.X - target.Width / 2);
+            Canvas.SetTop(target, mouth.Y - target.Height / 2);
+            // This offscreen window has no ActualWidth, so place the preview explicitly.
+            Canvas.SetLeft(token, Math.Clamp(mouth.X - 84, 0, 830 - token.Width));
+            Canvas.SetTop(token, Math.Clamp(mouth.Y + 20, 0, 590 - token.Height));
+            treatLayer.Visibility = Visibility.Visible;
+            root.UpdateLayout();
+            var tokenBounds = token.TransformToAncestor(root).TransformBounds(new Rect(token.RenderSize));
+            Require(tokenBounds.Left >= 0 && tokenBounds.Top >= 0
+                && tokenBounds.Right <= 830 && tokenBounds.Bottom <= 590,
+                $"The selected treat is clipped at {scale:P0}: {tokenBounds}.");
+            Save(root, 830, 590, Path.Combine(directory, $"treat-drag-scale-{scale:0.0}.png"));
+            treatLayer.Visibility = Visibility.Collapsed;
             var cloud = (WpfImage)window.FindName("AiCompanion");
             var character = (WpfImage)window.FindName("CharacterImage");
             var animator = (PetCompanionAnimator)typeof(MainWindow)

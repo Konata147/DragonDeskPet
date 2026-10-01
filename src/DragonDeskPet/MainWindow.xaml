@@ -15,6 +15,38 @@
         Closing="Window_Closing"
         LocationChanged="Window_LocationChanged">
     <Window.Resources>
+        <Style x:Key="PetChoiceButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#FFFBFF" />
+            <Setter Property="BorderBrush" Value="#D2C0EA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ChoiceSurface" CornerRadius="9"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChoiceSurface" Property="Background" Value="#EFE5FB" />
+                                <Setter TargetName="ChoiceSurface" Property="BorderBrush" Value="#9875C8" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ChoiceSurface" Property="Background" Value="#DDCCF3" />
+                                <Setter TargetName="ChoiceSurface" Property="BorderBrush" Value="#7653AD" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="PetPropButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="34" />
             <Setter Property="Height" Value="34" />
@@ -527,9 +559,12 @@
                 </Grid>
             </Button>
           </StackPanel>
-          <Border x:Name="PetChoicePanel" Visibility="Collapsed" Padding="6" CornerRadius="10"
-                  Background="#F9F3FF" BorderBrush="#B8A6DE" BorderThickness="1"
+          <Border x:Name="PetChoicePanel" Visibility="Collapsed" Padding="6" CornerRadius="12"
+                  Background="#FFF9FE" BorderBrush="#BDA7DF" BorderThickness="1"
                   MouseEnter="PetChoicePanel_MouseEnter" MouseLeave="PetChoicePanel_MouseLeave">
+            <Border.Effect>
+              <DropShadowEffect Color="#684B91" BlurRadius="7" ShadowDepth="2" Opacity="0.22" />
+            </Border.Effect>
             <StackPanel>
               <TextBlock x:Name="PetChoiceTitle" FontSize="11" Foreground="#74569F" Margin="3,0,3,4" />
               <StackPanel x:Name="PetChoiceItems" />
@@ -540,15 +575,13 @@
         <Canvas x:Name="TreatLayer" Panel.ZIndex="12" Visibility="Collapsed">
             <Ellipse x:Name="TreatTarget" Width="40" Height="40" Stroke="#AA9B75C4" StrokeThickness="1.5"
                      StrokeDashArray="2 3" IsHitTestVisible="False" />
-            <Border x:Name="TreatToken" Width="36" Height="36" CornerRadius="18" Background="#E5BA7B"
-                    BorderBrush="#A57744" BorderThickness="2" Cursor="Hand" Focusable="True"
+            <Border x:Name="TreatToken" Width="36" Height="36" CornerRadius="18" Background="#FFF8EC"
+                    BorderBrush="#BDA7DF" BorderThickness="1" Cursor="Hand" Focusable="True"
                     ToolTip="拖到嘴边投喂 · Esc 取消" MouseLeftButtonDown="Treat_MouseDown"
                     MouseMove="Treat_MouseMove" MouseLeftButtonUp="Treat_MouseUp" LostMouseCapture="Treat_LostCapture">
-                <Canvas IsHitTestVisible="False">
-                    <Ellipse Canvas.Left="8" Canvas.Top="6" Width="5" Height="5" Fill="#845C3C" />
-                    <Ellipse Canvas.Left="20" Canvas.Top="10" Width="4" Height="4" Fill="#845C3C" />
-                    <Ellipse Canvas.Left="12" Canvas.Top="20" Width="5" Height="5" Fill="#845C3C" />
-                </Canvas>
+                <Border.Effect>
+                    <DropShadowEffect Color="#684B91" BlurRadius="5" ShadowDepth="1" Opacity="0.22" />
+                </Border.Effect>
             </Border>
         </Canvas>
         <Grid x:Name="CharacterHost"
