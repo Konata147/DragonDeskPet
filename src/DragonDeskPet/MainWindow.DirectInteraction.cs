@@ -26,6 +26,105 @@ public partial class MainWindow
     private enum PetChoiceKind { Snacks, Dances }
     private PetChoiceKind? _choiceKind;
     private readonly DispatcherTimer _propHideTimer = new() { Interval = TimeSpan.FromMilliseconds(350) };
+    private readonly PetCompanionInvitation _companionInvitation = new(DateTimeOffset.UtcNow);
+
+    private bool CanContinueCompanionInvitation => IsVisible && !_closing && !_isFullscreenActive
+        && !_settingsOpen && !_isBusy && !_feeding && !_mouseDown && !_dragged
+        && _activePetActivity is null && !IsFocusing
+        && !_app.Settings.ReducePetMotion && _app.Settings.AmbientPetActionsEnabled
+        && _stateMachine.Current is PetState.Idle or PetState.Hover
+        && AiCompanion.Visibility == Visibility.Visible
+        && AiCompanionHitArea.RenderSize.Width > 0
+        && RootSurface.ActualWidth > 0 && RootSurface.ActualHeight > 0
+        && PetPropLayer.Visibility != Visibility.Visible
+        && QuickBar.Visibility != Visibility.Visible && ChatBubble.Visibility != Visibility.Visible
+        && ProductivityPanel.Visibility != Visibility.Visible && ReminderAlertCard.Visibility != Visibility.Visible
+        && OnboardingBubble.Visibility != Visibility.Visible
+        && !((ContextMenu)FindResource("PetMenu")).IsOpen
+        && !((ContextMenu)FindResource("InteractionMenu")).IsOpen;
+
+    private void TickCompanionInvitation(DateTimeOffset nowUtc)
+    {
+        var eligible = CanContinueCompanionInvitation;
+        if (_companionInvitation.IsShowing)
+        {
+            if (_companionInvitation.ShouldHide(nowUtc, eligible))
+                HideCompanionInvitation(interrupted: !eligible);
+            else PositionCompanionInvitation();
+            return;
+        }
+        if (!eligible)
+        {
+            // Quiet idle clips are brief and must not restart the two-minute wait.
+            if (!IsVisible || _isFullscreenActive || IsFocusing || _settingsOpen || _isBusy
+                || _feeding || _mouseDown || _dragged
+                || _stateMachine.Current == PetState.Sleeping
+                || _app.Settings.ReducePetMotion || !_app.Settings.AmbientPetActionsEnabled
+                || PetPropLayer.Visibility == Visibility.Visible
+                || QuickBar.Visibility == Visibility.Visible || ChatBubble.Visibility == Visibility.Visible
+                || ProductivityPanel.Visibility == Visibility.Visible || ReminderAlertCard.Visibility == Visibility.Visible
+                || OnboardingBubble.Visibility == Visibility.Visible)
+                _companionInvitation.Defer(nowUtc);
+            return;
+        }
+        if (_stateMachine.Current == PetState.Idle && !CharacterHost.IsMouseOver
+            && _companionInvitation.TryShow(nowUtc, _lastInteraction, true, out var kind))
+            ShowCompanionInvitation(kind);
+    }
+
+    private void ShowCompanionInvitation(PetCompanionInvitationKind kind)
+    {
+        var dance = kind == PetCompanionInvitationKind.Dance;
+        CompanionInviteIcon.Source = dance ? PetChoiceIcons.DanceSource(PetDance.Step)
+            : PetChoiceIcons.SnackSource(PetSnack.Cookie);
+        CompanionInviteText.Text = dance ? "跳支舞？" : "吃点心？";
+        CompanionInviteButton.ToolTip = dance ? "点一下，选择一支舞" : "点一下，选择点心";
+        PositionCompanionInvitation();
+        CompanionInviteLayer.Visibility = Visibility.Visible;
+        _companionAnimator.Invite(dance);
+        _nextAmbientAction = DateTimeOffset.UtcNow.AddSeconds(Random.Shared.Next(35, 61));
+    }
+
+    private void PositionCompanionInvitation()
+    {
+        if (RootSurface.ActualWidth <= 0 || RootSurface.ActualHeight <= 0) return;
+        var anchor = AiCompanionHitArea.TransformToAncestor(RootSurface)
+            .TransformBounds(new Rect(new Point(), AiCompanionHitArea.RenderSize));
+        var width = CompanionInviteButton.Width;
+        var height = CompanionInviteButton.Height;
+        var right = anchor.Right + 6;
+        var fitsRight = right + width <= RootSurface.ActualWidth - 4;
+        var x = fitsRight ? right : RootSurface.ActualWidth - width - 4;
+        var y = fitsRight ? anchor.Top + (anchor.Height - height) / 2
+            : anchor.Top - height - 8;
+        if (y < 4) y = anchor.Bottom + 8;
+        Canvas.SetLeft(CompanionInviteButton, Math.Clamp(x, 4, Math.Max(4, RootSurface.ActualWidth - width - 4)));
+        Canvas.SetTop(CompanionInviteButton, Math.Clamp(y, 4,
+            Math.Max(4, RootSurface.ActualHeight - height - 4)));
+    }
+
+    private void HideCompanionInvitation(bool interrupted = true)
+    {
+        if (!_companionInvitation.IsShowing && CompanionInviteLayer.Visibility != Visibility.Visible) return;
+        _companionInvitation.Hide(DateTimeOffset.UtcNow, interrupted);
+        CompanionInviteLayer.Visibility = Visibility.Collapsed;
+        _companionAnimator.EndInvitation();
+    }
+
+    private void CompanionInviteButton_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (!_companionInvitation.IsShowing) return;
+        var kind = _companionInvitation.CurrentKind;
+        HideCompanionInvitation();
+        if (!CanShowPetProps) return;
+        _lastInteraction = DateTimeOffset.Now;
+        ShowPetProps();
+        ShowPetChoices(kind == PetCompanionInvitationKind.Dance
+            ? PetChoiceKind.Dances : PetChoiceKind.Snacks);
+        _propHideTimer.Interval = TimeSpan.FromSeconds(3);
+        _propHideTimer.Start();
+    }
 
     private bool CanShowPetProps => IsVisible && !_closing && !_isFullscreenActive && !_settingsOpen
         && !_isBusy && !_feeding && !_mouseDown && !_dragged && _activePetActivity is null
@@ -50,6 +149,7 @@ public partial class MainWindow
     private void ShowPetProps()
     {
         if (!CanShowPetProps) { HidePetProps(); return; }
+        HideCompanionInvitation();
         _propHideTimer.Stop();
         PositionPetProps();
         PetPropLayer.Visibility = Visibility.Visible;
@@ -256,6 +356,7 @@ public partial class MainWindow
     private void ShowTreat(PetSnack snack = PetSnack.Cookie)
     {
         if (!PetCanInteract) return;
+        HideCompanionInvitation();
         HidePetProps();
         HideQuickBar();
         _animationPlayer.Stop();

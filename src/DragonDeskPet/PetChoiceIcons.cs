@@ -22,10 +22,11 @@ internal static class PetChoiceIcons
         Enum.GetValues<PetDance>().ToDictionary(dance => dance, DrawDance);
 
     internal static ImageSource SnackSource(PetSnack snack) => Snacks[snack];
+    internal static ImageSource DanceSource(PetDance dance) => Dances[dance];
 
     internal static Image Snack(PetSnack snack, double size) => Icon(SnackSource(snack), size);
 
-    internal static Image Dance(PetDance dance, double size) => Icon(Dances[dance], size);
+    internal static Image Dance(PetDance dance, double size) => Icon(DanceSource(dance), size);
 
     private static Image Icon(ImageSource source, double size) => new()
     {

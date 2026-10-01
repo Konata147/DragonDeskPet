@@ -15,6 +15,40 @@
         Closing="Window_Closing"
         LocationChanged="Window_LocationChanged">
     <Window.Resources>
+        <Style x:Key="CompanionInviteButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="108" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#FFF9FE" />
+            <Setter Property="BorderBrush" Value="#BDA7DF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="InviteSurface" CornerRadius="16"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Border.Effect>
+                                <DropShadowEffect Color="#684B91" BlurRadius="6"
+                                                  ShadowDepth="1" Opacity="0.23" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="InviteSurface" Property="Background" Value="#F0E6FF" />
+                                <Setter TargetName="InviteSurface" Property="BorderBrush" Value="#8E6AC4" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="InviteSurface" Property="Background" Value="#DDCDF5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="PetChoiceButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#FFFBFF" />
             <Setter Property="BorderBrush" Value="#D2C0EA" />
@@ -570,6 +604,18 @@
               <StackPanel x:Name="PetChoiceItems" />
             </StackPanel>
           </Border>
+        </Canvas>
+
+        <Canvas x:Name="CompanionInviteLayer" Panel.ZIndex="13" Visibility="Collapsed">
+            <Button x:Name="CompanionInviteButton" Style="{StaticResource CompanionInviteButtonStyle}"
+                    Click="CompanionInviteButton_Click">
+                <StackPanel Orientation="Horizontal" IsHitTestVisible="False">
+                    <Image x:Name="CompanionInviteIcon" Width="18" Height="18" Stretch="Uniform" />
+                    <TextBlock x:Name="CompanionInviteText" Margin="5,0,0,0"
+                               FontFamily="Microsoft YaHei UI" FontSize="11.5"
+                               Foreground="#624C82" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
         </Canvas>
 
         <Canvas x:Name="TreatLayer" Panel.ZIndex="12" Visibility="Collapsed">

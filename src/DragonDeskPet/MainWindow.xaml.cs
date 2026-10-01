@@ -86,6 +86,7 @@ public partial class MainWindow : Window
         _app = app;
         InitializeComponent();
         InitializePetInteractions();
+        IsVisibleChanged += (_, _) => { if (!IsVisible) HideCompanionInvitation(); };
 
         if (File.Exists(AssetService.IconPath))
         {
@@ -346,6 +347,7 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        HideCompanionInvitation();
         var cloudHit = AiCompanionHitArea.Visibility == Visibility.Visible
             && ReferenceEquals(e.OriginalSource, AiCompanionHitArea);
         if (!cloudHit && !IsCharacterPixelHit(e.GetPosition(CharacterImage)))
@@ -667,6 +669,7 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseWheel(object sender, MouseWheelEventArgs e)
     {
+        HideCompanionInvitation();
         MarkInteraction();
         var delta = e.Delta > 0 ? 0.1 : -0.1;
         ApplyScale(_app.Settings.Scale + delta, save: true);
@@ -675,6 +678,7 @@ public partial class MainWindow : Window
 
     private void CharacterHost_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
+        HideCompanionInvitation();
         HidePetProps();
         MarkInteraction(wake: false);
         if (_stateMachine.Current == PetState.Idle)
@@ -878,6 +882,7 @@ public partial class MainWindow : Window
         // starting a second response while the pointer is still in place.
         var settlingAfterFeedback = state == PetState.Hover && _lastVisualState == PetState.Happy;
         _lastVisualState = state;
+        if (state is not (PetState.Idle or PetState.Hover)) HideCompanionInvitation();
         if (state is not (PetState.Idle or PetState.Hover)) HidePetProps();
         if (state is not (PetState.Idle or PetState.Hover)) CancelLongPress();
         _animationPlayer.Stop();
@@ -905,10 +910,13 @@ public partial class MainWindow : Window
         CharacterHost.Opacity = state == PetState.Sleeping ? 0.78 : 1.0;
         _companionAnimator.SetState(state, _app.Settings.ReducePetMotion,
             _preserveCharacterImageForAction, settlingAfterFeedback);
+        if (_companionInvitation.IsShowing)
+            _companionAnimator.Invite(_companionInvitation.CurrentKind == PetCompanionInvitationKind.Dance);
         if (IsVisible && !_closing)
         {
             _petAnimator.ShowState(state, _app.Settings.ReducePetMotion, IsFocusing);
             if (state == PetState.Hover && !settlingAfterFeedback
+                && !_companionInvitation.IsShowing
                 && !_app.Settings.ReducePetMotion) PlayQuietClip("Hover");
         }
     }
@@ -925,6 +933,7 @@ public partial class MainWindow : Window
 
     private void ToggleChat()
     {
+        HideCompanionInvitation();
         HidePetProps();
         ProductivityPanel.Visibility = Visibility.Collapsed;
         ChatBubble.Visibility = ChatBubble.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
@@ -939,6 +948,7 @@ public partial class MainWindow : Window
 
     public void OpenProductivity()
     {
+        HideCompanionInvitation();
         HidePetProps();
         MarkInteraction();
         _hiddenByUser = false;
@@ -1214,6 +1224,7 @@ public partial class MainWindow : Window
 
     private void SetBusy(bool busy)
     {
+        if (busy) HideCompanionInvitation();
         _isBusy = busy;
         SendButton.IsEnabled = !busy;
         PromptBox.IsEnabled = !busy;
@@ -1307,6 +1318,7 @@ public partial class MainWindow : Window
 
     public void OpenSettings()
     {
+        HideCompanionInvitation();
         MarkInteraction();
         var window = new SettingsWindow(_app.Settings, saved =>
         {
@@ -1414,6 +1426,7 @@ public partial class MainWindow : Window
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
+        HideCompanionInvitation();
         HidePetProps();
         CancelPressGesture(suppressRelease: true);
         HideQuickBar();
@@ -1589,6 +1602,7 @@ public partial class MainWindow : Window
     {
         _hiddenForFullscreen = false;
         _hiddenByUser = true;
+        HideCompanionInvitation();
         HideQuickBar();
         Hide();
     }
@@ -1599,6 +1613,7 @@ public partial class MainWindow : Window
         if (AllowClose)
         {
             _closing = true;
+            HideCompanionInvitation();
             HidePetProps();
             CancelPressGesture(suppressRelease: true);
             CancelTreat();

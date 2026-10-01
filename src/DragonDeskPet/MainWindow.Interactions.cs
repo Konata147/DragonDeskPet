@@ -183,6 +183,7 @@ public partial class MainWindow
             : dance is { } captionDance ? PetInteractionVariants.Caption(captionDance) : null;
         var now = DateTimeOffset.UtcNow;
         if (!automatic && now < _nextManualAction) return;
+        HideCompanionInvitation();
         if (!automatic)
         {
             _nextManualAction = now.AddMilliseconds(350);
@@ -232,6 +233,7 @@ public partial class MainWindow
     private void TickPetInteractions(DateTimeOffset nowUtc)
     {
         _companionAnimator.Tick(nowUtc, IsFocusing);
+        TickCompanionInvitation(nowUtc);
         var available = IsVisible && !_isFullscreenActive && !_closing && !_settingsOpen
             && !_isBusy && !_mouseDown && !_dragged && !_feeding && !_animationPlayer.IsPlaying
             && _activePetActivity is null && _app.Settings.AmbientPetActionsEnabled && !_app.Settings.ReducePetMotion;
@@ -241,7 +243,7 @@ public partial class MainWindow
             if (available && _stateMachine.Current == PetState.Idle)
                 PlayQuietClip("Blink");
         }
-        if (nowUtc < _nextAmbientAction) return;
+        if (nowUtc < _nextAmbientAction || _companionInvitation.IsShowing) return;
         _nextAmbientAction = nowUtc.AddSeconds(Random.Shared.Next(35, 61));
         var panelOpen = _settingsOpen || _feeding || _animationPlayer.IsPlaying || ChatBubble.IsVisible || ProductivityPanel.IsVisible
             || ReminderAlertCard.IsVisible || OnboardingBubble.IsVisible || QuickBar.IsVisible

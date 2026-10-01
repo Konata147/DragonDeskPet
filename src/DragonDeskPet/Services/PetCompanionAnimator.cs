@@ -32,6 +32,7 @@ public sealed class PetCompanionAnimator(
     private (int Milliseconds, double Y)[] _reactionMotion = [];
     private int _nextReactionFace;
     private int _reactionDurationMs;
+    private bool _invitationActive;
     private long _revision;
     private PetState _state = PetState.Idle;
     private bool _reducedMotion;
@@ -249,6 +250,25 @@ public sealed class PetCompanionAnimator(
         timer.Start();
     }
 
+    public void Invite(bool dance)
+    {
+        if (image.Visibility != Visibility.Visible || _state is not (PetState.Idle or PetState.Hover)) return;
+        StopMotion();
+        _invitationActive = true;
+        SetFace(dance ? Mood.Happy : Mood.Curious);
+        if (!_reducedMotion)
+            Animate(translate, TranslateTransform.YProperty,
+                (0, 0), (300, -2), (700, 0));
+    }
+
+    public void EndInvitation()
+    {
+        if (_state is not (PetState.Idle or PetState.Hover)) return;
+        StopMotion();
+        if (image.Visibility == Visibility.Visible)
+            SetFace(_state == PetState.Hover ? Mood.Curious : Mood.Normal);
+    }
+
     private void EndTap(DispatcherTimer timer, long revision)
     {
         timer.Stop();
@@ -261,7 +281,7 @@ public sealed class PetCompanionAnimator(
 
     public void Tick(DateTimeOffset now, bool focusing)
     {
-        if (_tapTimer?.IsEnabled == true || _reducedMotion || image.Visibility != Visibility.Visible
+        if (_tapTimer?.IsEnabled == true || _invitationActive || _reducedMotion || image.Visibility != Visibility.Visible
             || _state is not (PetState.Idle or PetState.Hover)
             || now < _nextAmbient) return;
         _nextAmbient = now.AddSeconds(focusing ? Random.Shared.Next(13, 19)
@@ -327,6 +347,7 @@ public sealed class PetCompanionAnimator(
     private void StopMotion()
     {
         _revision++;
+        _invitationActive = false;
         _blinkTimer.Stop();
         _tapTimer?.Stop();
         _tapTimer = null;

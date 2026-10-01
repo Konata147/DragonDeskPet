@@ -25,6 +25,7 @@ internal static class PetInteractionTests
                 CheckVariantArtwork();
                 CheckVariantPlayback();
                 CheckCompanionVariantReactions();
+                CheckCompanionInvitationSchedule();
                 RenderVariantChoices(directory);
             }
             catch (Exception ex) { failure = ex; }
@@ -271,10 +272,50 @@ internal static class PetInteractionTests
         animator.SetState(PetState.Hover, false, false, settleAfterFeedback: true);
         Require(!translate.HasAnimatedProperties && ReferenceEquals(image.Source, Face("Curious")),
             "Finishing an interaction replayed the companion hover motion.");
+        animator.SetState(PetState.Idle, false, false);
+        animator.Invite(dance: false);
+        animator.Tick(DateTimeOffset.UtcNow.AddMinutes(1), focusing: false);
+        Require(ReferenceEquals(image.Source, Face("Curious")) && translate.HasAnimatedProperties
+            && !rotate.HasAnimatedProperties && !scale.HasAnimatedProperties,
+            "The snack invitation does not keep a quiet, cloud-only response.");
+        animator.EndInvitation();
+        Require(ReferenceEquals(image.Source, Face("Normal")) && !translate.HasAnimatedProperties,
+            "The companion did not settle after its invitation was dismissed.");
+        animator.Invite(dance: true);
+        Require(ReferenceEquals(image.Source, Face("Happy")),
+            "The dance invitation reused the snack expression.");
         animator.Suspend();
         Require(image.Visibility == Visibility.Collapsed,
             "Hiding did not stop the companion reaction.");
-        Console.WriteLine("PASS: eight distinct companion reactions, wing sync, interruption, sleep and static mode.");
+        Console.WriteLine("PASS: eight companion reactions and distinct finite invitations, interruption, sleep and static mode.");
+    }
+
+    private static void CheckCompanionInvitationSchedule()
+    {
+        var start = new DateTimeOffset(2026, 10, 1, 12, 0, 0, TimeSpan.Zero);
+        var schedule = new PetCompanionInvitation(start);
+        Require(!schedule.TryShow(start.AddSeconds(119), start, true, out _)
+            && !schedule.TryShow(start.AddMinutes(2), start, false, out _),
+            "The companion offered an invitation too early or while ineligible.");
+        Require(schedule.TryShow(start.AddMinutes(2), start, true, out var first)
+            && first == PetCompanionInvitationKind.Snack
+            && !schedule.ShouldHide(start.AddMinutes(2).AddSeconds(7), true)
+            && schedule.ShouldHide(start.AddMinutes(2).AddSeconds(8), true),
+            "The first invitation or its eight-second limit is wrong.");
+        schedule.Hide(start.AddMinutes(2).AddSeconds(8), interrupted: false);
+        Require(!schedule.TryShow(start.AddMinutes(5), start, true, out _)
+            && schedule.TryShow(start.AddMinutes(6), start, true, out var second)
+            && second == PetCompanionInvitationKind.Dance
+            && schedule.ShouldHide(start.AddMinutes(6), false),
+            "Invitations repeated too soon, failed to alternate or ignored interruption.");
+        schedule.Hide(start.AddMinutes(6), interrupted: true);
+        Require(!schedule.TryShow(start.AddMinutes(7), start, true, out _),
+            "An interrupted invitation returned before the idle delay.");
+        schedule.Defer(start.AddMinutes(8));
+        Require(!schedule.TryShow(start.AddMinutes(9), start, true, out _)
+            && schedule.TryShow(start.AddMinutes(10), start, true, out var third)
+            && third == PetCompanionInvitationKind.Snack,
+            "Focus or another blocked state did not defer the next invitation.");
     }
 
     private static void RenderVariantChoices(string directory)
@@ -294,6 +335,9 @@ internal static class PetInteractionTests
         var items = (StackPanel)window.FindName("PetChoiceItems");
         var token = (Border)window.FindName("TreatToken");
         var treatLayer = (Canvas)window.FindName("TreatLayer");
+        var inviteLayer = (Canvas)window.FindName("CompanionInviteLayer");
+        var inviteButton = (System.Windows.Controls.Button)window.FindName("CompanionInviteButton");
+        var inviteText = (TextBlock)window.FindName("CompanionInviteText");
         var kind = typeof(MainWindow).GetNestedType("PetChoiceKind", BindingFlags.NonPublic)!;
         foreach (var scale in new[] { .6, 1.0, 2.0 })
         {
@@ -368,6 +412,36 @@ internal static class PetInteractionTests
                 Save(root, 830, 590, Path.Combine(directory, $"{name.ToLowerInvariant()}-scale-{scale:0.0}.png"));
             }
             Invoke(window, "HidePetProps");
+            foreach (var (invitation, label) in new[] {
+                (PetCompanionInvitationKind.Snack, "吃点心？"),
+                (PetCompanionInvitationKind.Dance, "跳支舞？") })
+            {
+                Invoke(window, "ShowCompanionInvitation", invitation);
+                root.UpdateLayout();
+                var inviteBounds = inviteButton.TransformToAncestor(root)
+                    .TransformBounds(new Rect(inviteButton.RenderSize));
+                var companionHit = (Border)window.FindName("AiCompanionHitArea");
+                var companionBounds = companionHit.TransformToAncestor(root)
+                    .TransformBounds(new Rect(companionHit.RenderSize));
+                Require(inviteLayer.Visibility == Visibility.Visible && inviteText.Text == label
+                    && inviteBounds.Left >= 0 && inviteBounds.Top >= 0
+                    && inviteBounds.Right <= 830 && inviteBounds.Bottom <= 590
+                    && !inviteBounds.IntersectsWith(companionBounds),
+                    $"The {invitation} invitation is clipped or covers the cloud at {scale:P0}.");
+                Save(root, 830, 590, Path.Combine(directory,
+                    $"companion-invite-{invitation.ToString().ToLowerInvariant()}-scale-{scale:0.0}.png"));
+                Invoke(window, "HideCompanionInvitation", true);
+                Require(inviteLayer.Visibility == Visibility.Collapsed,
+                    "The companion invitation remained visible after dismissal.");
+            }
+            if (scale == 1)
+            {
+                Invoke(window, "ShowCompanionInvitation", PetCompanionInvitationKind.Snack);
+                Invoke(window, "ApplyStateVisual", PetState.Sleeping);
+                Require(inviteLayer.Visibility == Visibility.Collapsed,
+                    "The companion invitation survived the sleeping state.");
+                Invoke(window, "ApplyStateVisual", PetState.Idle);
+            }
             Invoke(window, "SetTreatVisual", PetSnack.CottonCandy);
             var mouth = (System.Windows.Point)typeof(MainWindow).GetMethod("MouthPoint",
                 BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null)!;
@@ -425,7 +499,7 @@ internal static class PetInteractionTests
         Require(panel.Visibility == Visibility.Collapsed && layer.Visibility == Visibility.Collapsed,
             "Hidden pet still has an open choice panel.");
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        Console.WriteLine("PASS: five/three choice targets visible and clickable at 60%, 100%, 200%; hide closes chooser.");
+        Console.WriteLine("PASS: five/three choices and brief alternating companion invitations fit at 60%, 100%, 200%; sleep interrupts invitations.");
     }
 
     public static void CheckBehavior()
