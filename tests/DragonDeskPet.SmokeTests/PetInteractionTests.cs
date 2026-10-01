@@ -290,6 +290,7 @@ internal static class PetInteractionTests
         var layer = (Canvas)window.FindName("PetPropLayer");
         var panel = (Border)window.FindName("PetChoicePanel");
         var bar = (StackPanel)window.FindName("PetPropBar");
+        var hopProp = (System.Windows.Controls.Button)window.FindName("PetPropHop");
         var items = (StackPanel)window.FindName("PetChoiceItems");
         var kind = typeof(MainWindow).GetNestedType("PetChoiceKind", BindingFlags.NonPublic)!;
         foreach (var scale in new[] { .6, 1.0, 2.0 })
@@ -312,8 +313,18 @@ internal static class PetInteractionTests
                 var barBounds = bar.TransformToAncestor(root).TransformBounds(new Rect(bar.RenderSize));
                 Require(bounds.Left >= 0 && bounds.Top >= 0 && bounds.Right <= 830 && bounds.Bottom <= 590,
                     $"{name} chooser is clipped at {scale:P0}: {bounds}");
+                Require(barBounds.Left >= 0 && barBounds.Top >= 0
+                    && barBounds.Right <= 830 && barBounds.Bottom <= 590,
+                    $"The three direct props are clipped at {scale:P0}: {barBounds}");
                 Require(bounds.Right + 4 <= barBounds.Left,
                     $"{name} chooser overlaps the default props at {scale:P0}.");
+                var hopBounds = hopProp.TransformToAncestor(root).TransformBounds(new Rect(hopProp.RenderSize));
+                var hopHit = VisualTreeHelper.HitTest(root, new System.Windows.Point(
+                    hopBounds.Left + hopBounds.Width / 2, hopBounds.Top + hopBounds.Height / 2))?.VisualHit;
+                while (hopHit is not null && !ReferenceEquals(hopHit, hopProp))
+                    hopHit = VisualTreeHelper.GetParent(hopHit);
+                Require(ReferenceEquals(hopHit, hopProp),
+                    $"The direct hop prop cannot be clicked at {scale:P0}.");
                 foreach (System.Windows.Controls.Button button in items.Children)
                 {
                     var buttonBounds = button.TransformToAncestor(root).TransformBounds(new Rect(button.RenderSize));
@@ -348,6 +359,10 @@ internal static class PetInteractionTests
                 $"The dancing companion changed size or escaped the window at {scale:P0}: {cloudBounds}.");
             animator.Suspend();
         }
+        panel.Visibility = Visibility.Visible;
+        Invoke(window, "PetPropHop_MouseEnter", hopProp, null!);
+        Require(panel.Visibility == Visibility.Collapsed,
+            "Moving to the direct hop prop left a snack or dance chooser open.");
         var hoverCloud = (WpfImage)window.FindName("AiCompanion");
         var hoverMotion = (TranslateTransform)window.FindName("AiCompanionTranslate");
         Invoke(window, "ApplyStateVisual", PetState.Happy);

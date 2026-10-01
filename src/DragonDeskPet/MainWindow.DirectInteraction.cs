@@ -41,9 +41,10 @@ public partial class MainWindow
         if (CharacterHost.RenderSize.Width <= 0 || RootSurface.ActualWidth <= 0 || RootSurface.ActualHeight <= 0) return;
         var bounds = CharacterHost.TransformToAncestor(RootSurface)
             .TransformBounds(new Rect(new Point(0, 0), CharacterHost.RenderSize));
-        Canvas.SetLeft(PetPropBar, Math.Clamp(bounds.Left - 28, 4, Math.Max(4, RootSurface.ActualWidth - 42)));
-        Canvas.SetTop(PetPropBar, Math.Clamp(bounds.Top + bounds.Height * .45 - 39,
-            4, Math.Max(4, RootSurface.ActualHeight - 82)));
+        Canvas.SetLeft(PetPropBar, Math.Clamp(bounds.Left - 28, 4,
+            Math.Max(4, RootSurface.ActualWidth - PetPropBar.Width - 4)));
+        Canvas.SetTop(PetPropBar, Math.Clamp(bounds.Top + bounds.Height * .45 - PetPropBar.Height / 2,
+            4, Math.Max(4, RootSurface.ActualHeight - PetPropBar.Height - 4)));
     }
 
     private void ShowPetProps()
@@ -77,6 +78,12 @@ public partial class MainWindow
 
     private void PetPropSnack_MouseEnter(object sender, MouseEventArgs e) => ShowPetChoices(PetChoiceKind.Snacks);
     private void PetPropDance_MouseEnter(object sender, MouseEventArgs e) => ShowPetChoices(PetChoiceKind.Dances);
+    private void PetPropHop_MouseEnter(object sender, MouseEventArgs e)
+    {
+        _propHideTimer.Stop();
+        PetChoicePanel.Visibility = Visibility.Collapsed;
+        _choiceKind = null;
+    }
     private void PetChoicePanel_MouseEnter(object sender, MouseEventArgs e) => _propHideTimer.Stop();
     private void PetChoicePanel_MouseLeave(object sender, MouseEventArgs e) => SchedulePetPropsHide();
 
@@ -198,6 +205,14 @@ public partial class MainWindow
         if (!CanShowPetProps) { HidePetProps(); return; }
         HidePetProps();
         PlayPetActivity(PetActivity.Dance, dance: PetDance.Step);
+    }
+
+    private void PetPropHop_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (!CanShowPetProps) { HidePetProps(); return; }
+        HidePetProps();
+        PlayPetActivity(PetActivity.Hop);
     }
 
     private bool TryGetArtworkRect(out Rect rect)
