@@ -263,6 +263,14 @@ internal static class PetInteractionTests
                 .GetValue(animator) is null
             && !translate.HasAnimatedProperties && ReferenceEquals(image.Source, Face("Thinking")),
             "Reduced motion did not keep a static companion expression.");
+        animator.SetState(PetState.Idle, false, false);
+        animator.SetState(PetState.Hover, false, false);
+        Require(translate.HasAnimatedProperties,
+            "Pointer entry no longer gives the companion its hover response.");
+        animator.SetState(PetState.Happy, false, true);
+        animator.SetState(PetState.Hover, false, false, settleAfterFeedback: true);
+        Require(!translate.HasAnimatedProperties && ReferenceEquals(image.Source, Face("Curious")),
+            "Finishing an interaction replayed the companion hover motion.");
         animator.Suspend();
         Require(image.Visibility == Visibility.Collapsed,
             "Hiding did not stop the companion reaction.");
@@ -340,6 +348,16 @@ internal static class PetInteractionTests
                 $"The dancing companion changed size or escaped the window at {scale:P0}: {cloudBounds}.");
             animator.Suspend();
         }
+        var hoverCloud = (WpfImage)window.FindName("AiCompanion");
+        var hoverMotion = (TranslateTransform)window.FindName("AiCompanionTranslate");
+        Invoke(window, "ApplyStateVisual", PetState.Happy);
+        Invoke(window, "ApplyStateVisual", PetState.Hover);
+        Require(!hoverMotion.HasAnimatedProperties && hoverCloud.Visibility == Visibility.Visible,
+            "Returning to hover after an action started another companion motion.");
+        Invoke(window, "ApplyStateVisual", PetState.Idle);
+        Invoke(window, "ApplyStateVisual", PetState.Hover);
+        Require(hoverMotion.HasAnimatedProperties,
+            "A genuine pointer-entry hover no longer animates the companion.");
         Invoke(window, "HidePetProps");
         Require(panel.Visibility == Visibility.Collapsed && layer.Visibility == Visibility.Collapsed,
             "Hidden pet still has an open choice panel.");

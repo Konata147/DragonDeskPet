@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private const uint SwpNoActivate = 0x0010;
     private readonly App _app;
     private readonly PetStateMachine _stateMachine = new();
+    private PetState _lastVisualState = PetState.Idle;
     private readonly Dictionary<PetState, BitmapSource> _stateImages = new();
     private Rect _artworkBounds = new(0, 0, 1, 1);
     private readonly IFullscreenDetectionService _fullscreenDetectionService = new FullscreenDetectionService();
@@ -873,6 +874,10 @@ public partial class MainWindow : Window
 
     private void ApplyStateVisual(PetState state)
     {
+        // Returning from feedback should settle on the hover pose, without
+        // starting a second response while the pointer is still in place.
+        var settlingAfterFeedback = state == PetState.Hover && _lastVisualState == PetState.Happy;
+        _lastVisualState = state;
         if (state is not (PetState.Idle or PetState.Hover)) HidePetProps();
         if (state is not (PetState.Idle or PetState.Hover)) CancelLongPress();
         _animationPlayer.Stop();
@@ -899,11 +904,12 @@ public partial class MainWindow : Window
 
         CharacterHost.Opacity = state == PetState.Sleeping ? 0.78 : 1.0;
         _companionAnimator.SetState(state, _app.Settings.ReducePetMotion,
-            _preserveCharacterImageForAction);
+            _preserveCharacterImageForAction, settlingAfterFeedback);
         if (IsVisible && !_closing)
         {
             _petAnimator.ShowState(state, _app.Settings.ReducePetMotion, IsFocusing);
-            if (state == PetState.Hover && !_app.Settings.ReducePetMotion) PlayQuietClip("Hover");
+            if (state == PetState.Hover && !settlingAfterFeedback
+                && !_app.Settings.ReducePetMotion) PlayQuietClip("Hover");
         }
     }
 

@@ -53,7 +53,8 @@ public sealed class PetCompanionAnimator(
         SetFace(Mood.Normal);
     }
 
-    public void SetState(PetState state, bool reducedMotion, bool hasActionArtwork)
+    public void SetState(PetState state, bool reducedMotion, bool hasActionArtwork,
+        bool settleAfterFeedback = false)
     {
         StopMotion();
         _state = state;
@@ -65,7 +66,7 @@ public sealed class PetCompanionAnimator(
         if (!show) return;
         SetFace(state == PetState.Hover ? Mood.Curious : Mood.Normal);
         _nextAmbient = DateTimeOffset.UtcNow.AddSeconds(Random.Shared.Next(7, 12));
-        if (state == PetState.Hover && !reducedMotion)
+        if (state == PetState.Hover && !reducedMotion && !settleAfterFeedback)
             Animate(translate, TranslateTransform.YProperty,
                 (0, 0), (180, -2), (450, 0));
     }
