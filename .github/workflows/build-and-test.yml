@@ -51,5 +51,11 @@ jobs:
       - name: Run smoke tests
         run: dotnet run --project tests/DragonDeskPet.SmokeTests/DragonDeskPet.SmokeTests.csproj --configuration Debug --no-build
 
+      - name: Verify pet interactions and scaled layout
+        run: dotnet run --project tests/DragonDeskPet.SmokeTests/DragonDeskPet.SmokeTests.csproj --configuration Debug --no-build -- --test-pet-interactions "${{ runner.temp }}\pet-interactions"
+
+      - name: Verify snack, dance and companion variants
+        run: dotnet run --project tests/DragonDeskPet.SmokeTests/DragonDeskPet.SmokeTests.csproj --configuration Debug --no-build -- --test-interaction-variants "${{ runner.temp }}\pet-interaction-variants"
+
       - name: Verify Release with zero warnings
         run: dotnet build DragonDeskPet.sln --configuration Release --no-restore -warnaserror
